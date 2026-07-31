@@ -36,45 +36,42 @@ Homer is a personal productivity CLI for developers, providing native integratio
 
 ### Requirements
 - **Python 3.13+**
-- **pip** or **PDM** (Package/Dependency Manager)
 - Jira and Clockify API credentials
 
-### Step 1: Clone the Repository
+### Install with pipx (Recommended)
+
+[pipx](https://pipx.pypa.io) installs Homer in an isolated environment and makes the `homer` command globally available — nothing to activate.
 
 ```bash
-git clone https://github.com/yourusername/homer.git
+pipx install homer-cli
+```
+
+### Install with pip
+
+```bash
+pip install homer-cli
+# or into a virtualenv:
+python3 -m venv ~/.venvs/homer && source ~/.venvs/homer/bin/activate
+pip install homer-cli
+```
+
+### Install from source (development)
+
+```bash
+git clone https://github.com/marcelohfonseca/homer.git
 cd homer
-```
-
-### Step 2: Install Dependencies
-
-Using **PDM** (recommended):
-```bash
 pdm install
+pdm run homer --help
 ```
 
-Using **pip**:
-```bash
-pip install -e .
-```
-
-### Step 3: Initialize Configuration
-
-Run the interactive setup to store your credentials in `~/.env`:
+### After installation
 
 ```bash
-homer init
+homer --version   # confirm it's installed
+homer init        # interactive credential setup
 ```
 
-You'll be prompted for:
-- **Jira Base URL** (e.g., `https://company.atlassian.net`)
-- **Jira User Email** (e.g., `john@company.com`)
-- **Jira API Token** (generate at https://id.atlassian.com/manage-profile/security/api-tokens)
-- **Clockify API Key** (get from https://app.clockify.me/settings/user)
-- **Clockify Workspace ID** (found in Clockify settings)
-- **Clockify User ID** (found in Clockify settings)
-
-All values are saved to `~/.env` and are reused on subsequent runs.
+> See [INSTALL.md](INSTALL.md) for detailed instructions, credential gathering guide, and troubleshooting.
 
 ## Quick Start
 

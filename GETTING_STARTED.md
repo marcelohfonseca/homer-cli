@@ -62,46 +62,49 @@ If you don't have Python 3.13+, install it from https://www.python.org/downloads
 
 ## Step 2: Install Homer
 
-### Option A: Using PDM (Recommended)
+### Option A: pipx (Recommended)
 
-**Install PDM first** (if you don't have it):
-```bash
-pip install pdm
-```
-
-**Clone and install Homer:**
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/homer.git
-cd homer
-
-# Install dependencies
-pdm install
-
-# Verify installation
-pdm run homer --help
-```
-
-### Option B: Using pip
+[pipx](https://pipx.pypa.io) installs Homer in an isolated environment and exposes `homer` globally — no virtualenv to manage.
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/homer.git
-cd homer
-
-# Create virtual environment
-python -m venv venv
-
-# Activate it
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate  # Windows
+# Install pipx (if you don't have it)
+pip install pipx
+pipx ensurepath
 
 # Install Homer
-pip install -e .
+pipx install homer-cli
 
-# Verify installation
-homer --help
+# Verify
+homer --version
+```
+
+### Option B: pip into a virtual environment
+
+```bash
+# Create a dedicated virtual environment
+python3 -m venv ~/.venvs/homer
+
+# Activate it
+source ~/.venvs/homer/bin/activate  # Linux/Mac
+# or:
+~\.venvs\homer\Scripts\activate     # Windows
+
+# Install Homer
+pip install homer-cli
+
+# Verify
+homer --version
+```
+
+> With this method you need to activate the virtualenv each time, or add `~/.venvs/homer/bin` to your `PATH`.
+
+### Option C: From source (contributors)
+
+```bash
+git clone https://github.com/marcelohfonseca/homer.git
+cd homer
+pdm install
+pdm run homer --version
 ```
 
 ---
@@ -111,10 +114,6 @@ homer --help
 ### Run Initialization
 
 ```bash
-# PDM users:
-pdm run homer init
-
-# Pip users:
 homer init
 ```
 
@@ -168,10 +167,6 @@ When complete, you'll see:
 ### Test Clockify
 
 ```bash
-# PDM users:
-pdm run homer clockify current
-
-# Pip users:
 homer clockify current
 ```
 
@@ -182,10 +177,6 @@ You should see either:
 ### Test Jira
 
 ```bash
-# PDM users:
-pdm run homer jira list
-
-# Pip users:
 homer jira list
 ```
 

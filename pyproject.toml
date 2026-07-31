@@ -1,14 +1,35 @@
 [project]
-name = "homer"
+name = "homer-cli"
 version = "0.1.0"
 description = "Homer is a personal productivity CLI that helps developers automate their daily workflow."
 authors = [
     {name = "Marcelo Henrique Fonseca",email = "dev@marcelofonseca.me"},
 ]
-dependencies = []
+dependencies = ["typer>=0.12", "rich>=13", "httpx>=0.27", "pydantic-settings[dotenv]>=2.3"]
 requires-python = ">=3.13"
 readme = "README.md"
 license = {text = "MIT"}
+keywords = ["cli", "productivity", "jira", "clockify", "time-tracking", "developer-tools"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Scheduling",
+    "Topic :: Software Development",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/marcelohfonseca/homer"
+Repository = "https://github.com/marcelohfonseca/homer"
+"Bug Tracker" = "https://github.com/marcelohfonseca/homer/issues"
+
+[project.scripts]
+homer = "homer.cli:app"
 
 [build-system]
 requires = ["pdm-backend"]
@@ -25,3 +46,11 @@ version_scheme = "pep440"
 version_provider = "pep621"
 update_changelog_on_bump = true
 major_version_zero = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]

@@ -10,49 +10,49 @@ Common issues and solutions.
 
 **Solutions:**
 
-1. **Make sure virtualenv is activated** (for pip install):
+1. **pipx users:** run `pipx ensurepath` and reload your shell:
    ```bash
-   # If using pip, activate the venv
-   source venv/bin/activate  # Linux/Mac
-   # or
-   venv\Scripts\activate  # Windows
-   
+   pipx ensurepath
+   source ~/.bashrc   # or: source ~/.zshrc
    homer --help
    ```
 
-2. **For PDM users**, make sure PDM tools are in PATH:
+2. **pip + venv users:** activate the virtualenv:
    ```bash
-   # Install with --with-python parameter
-   pdm install --with-python
-   
-   # Or run with pdm
-   pdm run homer --help
+   source ~/.venvs/homer/bin/activate
+   homer --help
    ```
 
-3. **Reinstall if needed:**
+3. **pip --user users:** ensure `~/.local/bin` is on your PATH:
    ```bash
-   # PDM
-   pdm install
-   
-   # Pip
-   pip install -e .
+   export PATH="$HOME/.local/bin:$PATH"
+   homer --help
    ```
 
-### Poetry/Pip Import Errors
+4. **Reinstall if needed:**
+   ```bash
+   pipx install homer-cli          # pipx
+   pip install homer-cli           # pip
+   # from source:
+   pdm install && pdm run homer --help
+   ```
+
+### Import Errors
 
 **Problem:** `ModuleNotFoundError: No module named 'homer'`
 
 **Solutions:**
 
 ```bash
-# If using pip
-pip install -e .
+# pipx reinstall
+pipx install homer-cli --force
 
-# If using PDM
-pdm install
+# pip: make sure the venv is activated
+source ~/.venvs/homer/bin/activate
+pip install homer-cli
 
-# For development (not recommended for users)
-export PYTHONPATH=/path/to/homer/src:$PYTHONPATH
+# from source (development)
+cd /path/to/homer && pdm install
 ```
 
 ### Permission Denied on ~/.env
@@ -515,11 +515,11 @@ If you're still stuck:
 
 3. **Reinstall as last resort:**
    ```bash
-   # PDM
-   pdm install --sync
-   
-   # Pip
-   pip install --upgrade -e .
+   # pipx
+   pipx install homer-cli --force
+
+   # pip
+   pip install --upgrade homer-cli
    ```
 
 4. **Report issue:**

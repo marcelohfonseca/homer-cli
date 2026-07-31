@@ -5,14 +5,17 @@ Quick reference for Homer commands.
 ## Setup
 
 ```bash
-# Install
-pdm install
-# or: pip install -e .
+# Install (recommended)
+pipx install homer-cli
+
+# or with pip
+pip install homer-cli
 
 # Configure
 homer init
 
 # Verify
+homer --version
 homer --help
 ```
 
