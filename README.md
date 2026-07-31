@@ -58,7 +58,7 @@ pip install homer-cli
 ### Install from source (development)
 
 ```bash
-git clone https://github.com/marcelohfonseca/homer.git
+git clone https://github.com/marcelohfonseca/homer-cli.git
 cd homer
 pdm install
 pdm run homer --help

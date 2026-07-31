@@ -101,7 +101,7 @@ homer --version
 ### Option C: From source (contributors)
 
 ```bash
-git clone https://github.com/marcelohfonseca/homer.git
+git clone https://github.com/marcelohfonseca/homer-cli.git
 cd homer
 pdm install
 pdm run homer --version

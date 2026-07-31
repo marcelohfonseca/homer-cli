@@ -56,7 +56,7 @@ pip install --user homer-cli
 ### Method 3: From source (for contributors / development)
 
 ```bash
-git clone https://github.com/marcelohfonseca/homer.git
+git clone https://github.com/marcelohfonseca/homer-cli.git
 cd homer
 pdm install            # installs all deps + project in editable mode
 pdm run homer --help   # run inside the project venv

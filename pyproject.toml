@@ -24,9 +24,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/marcelohfonseca/homer"
-Repository = "https://github.com/marcelohfonseca/homer"
-"Bug Tracker" = "https://github.com/marcelohfonseca/homer/issues"
+Homepage = "https://github.com/marcelohfonseca/homer-cli"
+Repository = "https://github.com/marcelohfonseca/homer-cli"
+"Bug Tracker" = "https://github.com/marcelohfonseca/homer-cli/issues"
 
 [project.scripts]
 homer = "homer.cli:app"
