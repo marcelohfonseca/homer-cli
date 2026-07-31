@@ -1,0 +1,19 @@
+[project]
+name = "homer"
+version = "0.1.0"
+description = "Homer is a personal productivity CLI that helps developers automate their daily workflow."
+authors = [
+    {name = "Marcelo Henrique Fonseca",email = "dev@marcelofonseca.me"},
+]
+dependencies = []
+requires-python = ">=3.13"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[tool.pdm]
+distribution = true
