@@ -71,6 +71,8 @@ homer --version   # confirm it's installed
 homer init        # interactive credential setup
 ```
 
+![Homer CLI after installation](assets/install.png)
+
 > See [INSTALL.md](INSTALL.md) for detailed instructions, credential gathering guide, and troubleshooting.
 
 ## Quick Start
