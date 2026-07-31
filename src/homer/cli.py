@@ -17,12 +17,13 @@ from rich.text import Text
 
 from homer import __version__
 
-_ASCII_ART = r"""
- _                                        _  _ 
-| |__   ___  _ __ ___    ___  _ __      | |(_)
-| '_ \ / _ \| '_ ` _ \  / _ \| '__|____| || |
-| | | | (_) | | | | | ||  __/| |  |_____| || |
-|_| |_|\___/|_| |_| |_| \___||_|        |_||_|
+_ASCII_ART = """
+██╗  ██╗ ██████╗ ███╗   ███╗███████╗██████╗ 
+██║  ██║██╔═══██╗████╗ ████║██╔════╝██╔══██╗
+███████║██║   ██║██╔████╔██║█████╗  ██████╔╝
+██╔══██║██║   ██║██║╚██╔╝██║██╔══╝  ██╔══██╗
+██║  ██║╚██████╔╝██║ ╚═╝ ██║███████╗██║  ██║
+╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝
 """
 
 app = typer.Typer(
@@ -42,7 +43,7 @@ app.add_typer(jira_app, name="jira")
 
 def _print_banner() -> None:
     """Print the Homer ASCII art banner."""
-    art = Text(_ASCII_ART, style="bold cyan", no_wrap=True)
+    art = Text(_ASCII_ART, style="bold yellow", no_wrap=True)
     console.print(art)
     console.print(
         f"  [dim]v{__version__} — personal productivity CLI for developers[/dim]\n"
