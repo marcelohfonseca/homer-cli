@@ -158,9 +158,9 @@ class ClockifyService:
             if proj.name == name:
                 return proj.id
 
-        # Try partial match (useful for searching "[JIRA-KEY] Summary")
+        # Try partial match (project name contains search term)
         for proj in projects:
-            if name in proj.name or proj.name in name:
+            if name in proj.name:
                 return proj.id
 
         # Not found; create it

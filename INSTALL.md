@@ -4,7 +4,7 @@ This guide walks you through installing Homer on your machine.
 
 ## Prerequisites
 
-- **Python 3.13 or higher**
+- **Python 3.12 or higher**
 - **Jira account** with API token access
 - **Clockify account** with API key access
 
@@ -171,15 +171,15 @@ Reload: `source ~/.bashrc`
 - **pip users:** activate your virtualenv (`source ~/.venvs/homer/bin/activate`)
 - **pip --user users:** ensure `~/.local/bin` is in `$PATH`
 
-### "Python 3.13+ required"
+### "Python 3.12+ required"
 
 ```bash
 python3 --version
 ```
 
-Install 3.13+ if needed:
-- macOS: `brew install python@3.13`
-- Ubuntu: `sudo apt-get install python3.13`
+Install 3.12+ if needed:
+- macOS: `brew install python@3.12`
+- Ubuntu: `sudo apt-get install python3.12`
 - Windows/all: https://www.python.org/downloads/
 
 ### "Configuration missing: JIRA_BASE_URL"
