@@ -13,13 +13,22 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.text import Text
 
 from homer import __version__
+
+_ASCII_ART = r"""
+ _                                        _  _ 
+| |__   ___  _ __ ___    ___  _ __      | |(_)
+| '_ \ / _ \| '_ ` _ \  / _ \| '__|____| || |
+| | | | (_) | | | | | ||  __/| |  |_____| || |
+|_| |_|\___/|_| |_| |_| \___||_|        |_||_|
+"""
 
 app = typer.Typer(
     name="homer",
     help="Homer — personal productivity CLI for developers.",
-    no_args_is_help=True,
+    no_args_is_help=False,
 )
 console = Console()
 
@@ -31,14 +40,24 @@ app.add_typer(clockify_app, name="clockify")
 app.add_typer(jira_app, name="jira")
 
 
+def _print_banner() -> None:
+    """Print the Homer ASCII art banner."""
+    art = Text(_ASCII_ART, style="bold cyan", no_wrap=True)
+    console.print(art)
+    console.print(
+        f"  [dim]v{__version__} — personal productivity CLI for developers[/dim]\n"
+    )
+
+
 def _version_callback(value: bool) -> None:
     if value:
         console.print(f"homer [bold cyan]{__version__}[/bold cyan]")
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def _callback(
+    ctx: typer.Context,
     version: Optional[bool] = typer.Option(
         None,
         "--version",
@@ -49,6 +68,9 @@ def _callback(
     ),
 ) -> None:
     """Homer — personal productivity CLI for developers."""
+    if ctx.invoked_subcommand is None:
+        _print_banner()
+        console.print(ctx.get_help())
 
 # Fields required by Settings, in the order they are prompted during init.
 # Each entry is (env_key, human_label, is_secret).
@@ -115,9 +137,10 @@ def init() -> None:
     env_path = _get_env_path()
     existing = _load_env_file(env_path)
 
+    _print_banner()
     console.print(
         Panel(
-            "[bold cyan]Homer[/bold cyan] — Initial Setup",
+            "Initial Setup",
             subtitle=f"[dim]{env_path}[/dim]",
             expand=False,
         )
