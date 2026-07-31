@@ -35,7 +35,7 @@ Homer is a personal productivity CLI for developers, providing native integratio
 ## Installation
 
 ### Requirements
-- **Python 3.13+**
+- **Python 3.12+**
 - Jira and Clockify API credentials
 
 ### Install with pipx (Recommended)
@@ -318,6 +318,11 @@ pdm run pytest tests/ -v
 pdm run ruff check .
 pdm run mypy src/
 ```
+
+> **Note:** Requires `ruff` and `mypy` in your dev environment. Install them with:
+> ```bash
+> pip install ruff mypy
+> ```
 
 ### Project Structure
 

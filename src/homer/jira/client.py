@@ -174,7 +174,7 @@ class JiraClient:
         Raises:
             JiraError: On API failure.
         """
-        url = f"{self.base_url}/rest/api/3/issue/{issue_key}/comments"
+        url = f"{self.base_url}/rest/api/3/issue/{issue_key}/comment"
         payload = {"body": body}
 
         try:

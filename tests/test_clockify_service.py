@@ -423,3 +423,29 @@ class TestDetailedReport:
         call_args = mock_client.detailed_report.call_args
         assert call_args[1]["project_ids"] == ["p-1"]
 
+
+
+class TestListProjects:
+    """Service returns project names for UI selection."""
+
+    def test_returns_sorted_project_names(
+        self, service: ClockifyService, mock_client: MagicMock
+    ) -> None:
+        mock_client.get_projects.return_value = [
+            Project(id="p-1", name="mobile-app"),
+            Project(id="p-2", name="web-api"),
+            Project(id="p-3", name="admin"),
+        ]
+
+        result = service.list_projects()
+
+        assert result == ["admin", "mobile-app", "web-api"]
+
+    def test_returns_empty_list_when_no_projects(
+        self, service: ClockifyService, mock_client: MagicMock
+    ) -> None:
+        mock_client.get_projects.return_value = []
+
+        result = service.list_projects()
+
+        assert result == []

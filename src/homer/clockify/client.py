@@ -95,7 +95,9 @@ class ClockifyClient:
             The created project.
 
         Raises:
-            ClockifyError: On API failure (including 409 Conflict if name exists).
+            ClockifyError: On API failure, with the response body included
+                for easier diagnosis (e.g. 403 when workspace plan forbids
+                project creation, or 400 for invalid name).
         """
         url = f"{self.BASE_URL}/workspaces/{self.workspace_id}/projects"
         body = {"name": name, "isPublic": False}
@@ -105,8 +107,14 @@ class ClockifyClient:
             )
             response.raise_for_status()
             return Project(**response.json())
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text or str(exc)
+            raise ClockifyError(
+                f"Failed to create project '{name}' "
+                f"(HTTP {exc.response.status_code}): {detail}"
+            ) from exc
         except httpx.HTTPError as exc:
-            raise ClockifyError(f"Failed to create project: {exc}") from exc
+            raise ClockifyError(f"Failed to create project '{name}': {exc}") from exc
 
     def create_tag(self, name: str) -> Tag:
         """Create a new tag.

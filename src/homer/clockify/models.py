@@ -107,16 +107,7 @@ class TimeEntryInput(BaseModel):
     def model_dump_clockify(self) -> dict[str, Any]:
         """Serialize to Clockify API format.
 
-        Clockify uses camelCase in JSON (contrary to the Python snake_case
-        convention). This method produces the correct JSON structure.
-
         Returns:
-            Dictionary with keys in Clockify's expected format.
+            Dictionary ready to send as JSON to the Clockify API.
         """
-        data = self.model_dump(exclude_none=True)
-        # Convert snake_case to camelCase for API
-        if "tag_ids" in data:
-            data["tagIds"] = data.pop("tag_ids")
-        if "project_id" in data:
-            data["projectId"] = data.pop("project_id")
-        return data
+        return self.model_dump(exclude_none=True)

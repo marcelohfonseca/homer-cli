@@ -47,11 +47,12 @@ class TestStartCommand:
                 mock_service = MagicMock()
                 mock_service.start_timer.return_value = mock_entry
                 mock_service_factory.return_value = mock_service
-
-                result = runner.invoke(app, ["start", "Work"])
+                # Bypass interactive prompt — no project
+                with patch("homer.clockify.commands._prompt_project", return_value=None):
+                    result = runner.invoke(app, ["start", "Work"])
 
         assert result.exit_code == 0
-        assert "Timer started" in result.output
+        assert "Timer Started" in result.output
         assert "Work" in result.output
 
     def test_starts_timer_with_project_and_tags(
@@ -99,6 +100,85 @@ class TestStartCommand:
 
         assert result.exit_code == 1
         assert "Missing API key" in result.output
+
+    def test_interactive_prompt_selects_project_by_number(
+        self, runner: CliRunner
+    ) -> None:
+        """When --project is omitted, selecting '1' picks the first project."""
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+            projectId="p-1",
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.start_timer.return_value = mock_entry
+                mock_service.list_projects.return_value = ["web-api", "mobile-app"]
+                mock_service_factory.return_value = mock_service
+
+                # Simulate user typing "1" then Enter to pick first project
+                with patch("homer.clockify.commands._prompt_project", return_value="web-api"):
+                    result = runner.invoke(app, ["start", "Work"])
+
+        assert result.exit_code == 0
+        call_args = mock_service.start_timer.call_args
+        assert call_args.kwargs["project_name"] == "web-api"
+
+    def test_interactive_prompt_accepts_free_text(
+        self, runner: CliRunner
+    ) -> None:
+        """When --project is omitted, typing text uses it as project name."""
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.start_timer.return_value = mock_entry
+                mock_service.list_projects.return_value = []
+                mock_service_factory.return_value = mock_service
+
+                with patch("homer.clockify.commands._prompt_project", return_value="new-project"):
+                    result = runner.invoke(app, ["start", "Work"])
+
+        assert result.exit_code == 0
+        call_args = mock_service.start_timer.call_args
+        assert call_args.kwargs["project_name"] == "new-project"
+
+    def test_interactive_prompt_skips_project_on_blank(
+        self, runner: CliRunner
+    ) -> None:
+        """When --project is omitted and user presses Enter, project is None."""
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.start_timer.return_value = mock_entry
+                mock_service_factory.return_value = mock_service
+
+                with patch("homer.clockify.commands._prompt_project", return_value=None):
+                    result = runner.invoke(app, ["start", "Work"])
+
+        assert result.exit_code == 0
+        call_args = mock_service.start_timer.call_args
+        assert call_args.kwargs["project_name"] is None
 
 
 class TestCurrentCommand:

@@ -124,6 +124,18 @@ class ClockifyService:
 
         return stopped
 
+    def list_projects(self) -> list[str]:
+        """Return names of all existing Clockify projects.
+
+        Returns:
+            Sorted list of project names.
+
+        Raises:
+            ClockifyError: On API failure.
+        """
+        projects = self.client.get_projects()
+        return sorted(p.name for p in projects)
+
     def _resolve_or_create_project(self, name: str) -> str:
         """Resolve a project name to ID, creating it if necessary.
 
@@ -146,9 +158,9 @@ class ClockifyService:
             if proj.name == name:
                 return proj.id
 
-        # Try partial match (useful for searching "[JIRA-KEY] Summary")
+        # Try partial match (project name contains search term)
         for proj in projects:
-            if name in proj.name or proj.name in name:
+            if name in proj.name:
                 return proj.id
 
         # Not found; create it
