@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
 from homer.config import get_settings
 from homer.clockify.service import ClockifyService
@@ -79,19 +80,103 @@ def _validate_date(date_str: str) -> str:
     return date_str
 
 
+def _prompt_project(service: ClockifyService) -> str | None:
+    """Interactively prompt the user to select or type a project name.
+
+    Displays a numbered list combining existing Clockify projects and open
+    Jira issues. The user may enter a number to select from the list, type
+    any free-form text to use as a new project name, or leave blank to skip.
+
+    Args:
+        service: Initialized ClockifyService used to fetch projects.
+
+    Returns:
+        The chosen project name string, or None if the user skips.
+    """
+    choices: list[tuple[str, str]] = []  # (label_for_display, value_to_use)
+
+    # --- Clockify projects ---
+    try:
+        project_names = service.list_projects()
+        for name in project_names:
+            choices.append((name, name))
+    except ClockifyError:
+        pass  # non-fatal — just skip the project list
+
+    # --- Open Jira issues ---
+    try:
+        from homer.jira.service import JiraService
+        settings = get_settings()
+        jira_service = JiraService.from_settings(settings)
+        issues = jira_service.list_my_issues()
+        for issue in issues:
+            label = f"{issue.key} · {issue.summary}"
+            choices.append((label, label))
+    except Exception:
+        pass  # Jira not configured or unavailable — non-fatal
+
+    if not choices:
+        value = typer.prompt(
+            "Project name (blank to skip)",
+            default="",
+            show_default=False,
+        ).strip()
+        return value or None
+
+    # Build display
+    console.print()
+    col_width = max(len(label) for label, _ in choices) + 2
+
+    # Separate Clockify projects from Jira issues
+    clockify_count = sum(1 for label, _ in choices if " · " not in label)
+
+    console.print("  [bold]Select a project[/bold] [dim](number, or type a new name, or Enter to skip)[/dim]")
+    console.print()
+
+    if clockify_count:
+        console.print("  [dim]Clockify projects[/dim]")
+        for i, (label, _) in enumerate(choices[:clockify_count], start=1):
+            console.print(f"  [cyan]{i:>2}[/cyan]  {label}")
+
+    jira_choices = choices[clockify_count:]
+    if jira_choices:
+        console.print()
+        console.print("  [dim]Open Jira issues[/dim]")
+        for i, (label, _) in enumerate(jira_choices, start=clockify_count + 1):
+            console.print(f"  [cyan]{i:>2}[/cyan]  {label}")
+
+    console.print()
+    raw = typer.prompt("> ", default="", show_default=False, prompt_suffix="").strip()
+
+    if not raw:
+        return None
+
+    # Numeric selection
+    if raw.isdigit():
+        idx = int(raw) - 1
+        if 0 <= idx < len(choices):
+            return choices[idx][1]
+        console.print(f"[yellow]⚠[/yellow]  Invalid selection '{raw}', using as project name.")
+
+    return raw
+
+
 @app.command()
 def start(
     description: str = typer.Argument(
         help="Timer description"
     ),
     project: str | None = typer.Option(
-        None, "--project", "-p", help="Project name"
+        None, "--project", "-p", help="Project name (omit to select interactively)"
     ),
     tags: str | None = typer.Option(
         None, "--tags", "-t", help="Comma-separated list of tags"
     ),
 ) -> None:
     """Start a new timer.
+
+    When --project is omitted, an interactive selector shows your existing
+    Clockify projects and open Jira issues to choose from.
 
     Examples:
         homer clockify start "Fixing login bug"
@@ -100,12 +185,17 @@ def start(
     try:
         service = _get_service()
 
+        # If no project supplied, offer interactive selection
+        resolved_project = project
+        if resolved_project is None:
+            resolved_project = _prompt_project(service)
+
         # Parse tags from comma-separated string
         tag_list = [tag.strip() for tag in tags.split(",")] if tags else None
 
         entry = service.start_timer(
             description=description,
-            project_name=project,
+            project_name=resolved_project,
             tag_names=tag_list,
         )
 

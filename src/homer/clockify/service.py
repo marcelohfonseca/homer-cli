@@ -124,6 +124,18 @@ class ClockifyService:
 
         return stopped
 
+    def list_projects(self) -> list[str]:
+        """Return names of all existing Clockify projects.
+
+        Returns:
+            Sorted list of project names.
+
+        Raises:
+            ClockifyError: On API failure.
+        """
+        projects = self.client.get_projects()
+        return sorted(p.name for p in projects)
+
     def _resolve_or_create_project(self, name: str) -> str:
         """Resolve a project name to ID, creating it if necessary.
 
