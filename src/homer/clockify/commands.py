@@ -7,8 +7,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 import typer
+from rich.columns import Columns
 from rich.console import Console
-from rich.table import Table
+from rich.panel import Panel
+from rich.table import Table, box
 from rich.text import Text
 
 from homer.config import get_settings
@@ -57,6 +59,23 @@ def _format_duration(seconds: int) -> str:
     minutes = (seconds % 3600) // 60
     secs = seconds % 60
     return f"{hours}:{minutes:02d}:{secs:02d}"
+
+
+def _kv_table(*rows: tuple[str, str]) -> Table:
+    """Build a borderless key-value table for use inside panels.
+
+    Args:
+        rows: Pairs of (key, value) to display.
+
+    Returns:
+        Configured Rich Table.
+    """
+    t = Table.grid(padding=(0, 2))
+    t.add_column(style="dim", min_width=10)
+    t.add_column()
+    for key, value in rows:
+        t.add_row(key, value)
+    return t
 
 
 def _validate_date(date_str: str) -> str:
@@ -125,9 +144,6 @@ def _prompt_project(service: ClockifyService) -> str | None:
 
     # Build display
     console.print()
-    col_width = max(len(label) for label, _ in choices) + 2
-
-    # Separate Clockify projects from Jira issues
     clockify_count = sum(1 for label, _ in choices if " · " not in label)
 
     console.print("  [bold]Select a project[/bold] [dim](number, or type a new name, or Enter to skip)[/dim]")
@@ -179,8 +195,8 @@ def start(
     Clockify projects and open Jira issues to choose from.
 
     Examples:
-        homer clockify start "Fixing login bug"
-        homer clockify start "Code review" --project "web-api" --tags "review,urgent"
+        homer ck start "Fixing login bug"
+        homer ck start "Code review" --project "web-api" --tags "review,urgent"
     """
     try:
         service = _get_service()
@@ -199,13 +215,21 @@ def start(
             tag_names=tag_list,
         )
 
-        console.print("[green]▶[/green] Timer started")
-        console.print(f"[cyan]ID[/cyan]          {entry.id}")
-        console.print(f"[cyan]Description[/cyan]  {entry.description}")
-        if entry.projectId:
-            console.print(f"[cyan]Project[/cyan]      {entry.projectId}")
-        if entry.tagIds:
-            console.print(f"[cyan]Tags[/cyan]         {', '.join(entry.tagIds)}")
+        rows: list[tuple[str, str]] = [("Description", entry.description or "")]
+        if resolved_project:
+            rows.append(("Project", resolved_project))
+        if tag_list:
+            rows.append(("Tags", "  ".join(f"[cyan]#{t}[/cyan]" for t in tag_list)))
+
+        console.print(
+            Panel(
+                _kv_table(*rows),
+                title="[bold green]▶  Timer Started[/bold green]",
+                border_style="green",
+                expand=False,
+                padding=(1, 2),
+            )
+        )
 
     except ClockifyError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
@@ -220,19 +244,43 @@ def current() -> None:
         entry = service.get_current_timer()
 
         if not entry:
-            console.print("[yellow]ℹ[/yellow] No timer running")
+            console.print("[yellow]ℹ[/yellow]  No timer running")
             return
 
-        # Compute elapsed time
         if isinstance(entry.timeInterval.start, str):
             start_dt = datetime.fromisoformat(entry.timeInterval.start.replace("Z", "+00:00"))
         else:
             start_dt = entry.timeInterval.start
         elapsed = datetime.now(start_dt.tzinfo) - start_dt
         elapsed_sec = int(elapsed.total_seconds())
+        elapsed_str = _format_duration(elapsed_sec)
 
         desc = entry.description or "(no description)"
-        console.print(f"[green]🚀[/green] Active: [bold]{desc}[/bold] [[bold]{_format_duration(elapsed_sec)}[/bold]]")
+
+        header = Text()
+        header.append(desc, style="bold white")
+        header.append(f"  {elapsed_str}", style="bold yellow")
+
+        rows: list[tuple[str, str]] = []
+        if entry.projectId:
+            rows.append(("Project", entry.projectId))
+        if entry.tagIds:
+            rows.append(("Tags", "  ".join(f"[cyan]#{t}[/cyan]" for t in entry.tagIds)))
+
+        content = Table.grid(padding=(0, 0))
+        content.add_row(header)
+        if rows:
+            content.add_row(_kv_table(*rows))
+
+        console.print(
+            Panel(
+                content,
+                title="[bold yellow]⏱  Active Timer[/bold yellow]",
+                border_style="yellow",
+                expand=False,
+                padding=(1, 2),
+            )
+        )
 
     except ClockifyError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
@@ -247,11 +295,10 @@ def stop() -> None:
         stopped = service.stop_all_timers()
 
         if not stopped:
-            console.print("[yellow]ℹ[/yellow] No timers running")
+            console.print("[yellow]ℹ[/yellow]  No timers running")
             return
 
         for entry in stopped:
-            # Compute elapsed time
             if isinstance(entry.timeInterval.start, str):
                 start_dt = datetime.fromisoformat(entry.timeInterval.start.replace("Z", "+00:00"))
             else:
@@ -262,12 +309,31 @@ def stop() -> None:
             else:
                 end_dt = entry.timeInterval.end
 
-            elapsed = end_dt - start_dt
-            elapsed_sec = int(elapsed.total_seconds())
-
+            elapsed_sec = int((end_dt - start_dt).total_seconds())
+            elapsed_str = _format_duration(elapsed_sec)
             desc = entry.description or "(no description)"
+
+            header = Text()
+            header.append(desc, style="bold white")
+            header.append(f"  {elapsed_str}", style="bold cyan")
+
+            rows: list[tuple[str, str]] = []
+            if entry.projectId:
+                rows.append(("Project", entry.projectId))
+
+            content = Table.grid()
+            content.add_row(header)
+            if rows:
+                content.add_row(_kv_table(*rows))
+
             console.print(
-                f"[red]⏹[/red] Stopped: [bold]{desc}[/bold] [[bold]{_format_duration(elapsed_sec)}[/bold]]"
+                Panel(
+                    content,
+                    title="[bold red]⏹  Timer Stopped[/bold red]",
+                    border_style="red",
+                    expand=False,
+                    padding=(1, 2),
+                )
             )
 
     except ClockifyError as exc:
@@ -277,38 +343,26 @@ def stop() -> None:
 
 @app.command()
 def summary(
-    date_from: str = typer.Argument(
-        help="Start date (YYYY-MM-DD)"
-    ),
-    date_to: str = typer.Argument(
-        help="End date (YYYY-MM-DD)"
-    ),
-    project: str | None = typer.Option(
-        None, "--project", "-p", help="Filter by project name"
-    ),
-    tags: str | None = typer.Option(
-        None, "--tags", "-t", help="Filter by tag name"
-    ),
+    date_from: str = typer.Argument(help="Start date (YYYY-MM-DD)"),
+    date_to: str = typer.Argument(help="End date (YYYY-MM-DD)"),
+    project: str | None = typer.Option(None, "--project", "-p", help="Filter by project name"),
+    tags: str | None = typer.Option(None, "--tags", "-t", help="Filter by tag name"),
     group_by: str | None = typer.Option(
         "PROJECT", "--group-by", "-g",
-        help="Group by: PROJECT, DATE, TAG, or combinations"
+        help="Group by: PROJECT, DATE, TAG, or combinations",
     ),
 ) -> None:
     """Fetch a summary report for a date range.
 
     Examples:
-        homer clockify summary 2024-01-01 2024-01-31
-        homer clockify summary 2024-01-01 2024-01-31 --project "web-api"
-        homer clockify summary 2024-01-01 2024-01-31 --group-by DATE
+        homer ck summary 2024-01-01 2024-01-31
+        homer ck summary 2024-01-01 2024-01-31 --project "web-api"
+        homer ck summary 2024-01-01 2024-01-31 --group-by DATE
     """
     try:
-        # Validate dates
         date_from = _validate_date(date_from)
         date_to = _validate_date(date_to)
-
         service = _get_service()
-
-        # Parse group_by
         group_by_list = [g.strip() for g in group_by.split(",")] if group_by else None
 
         report = service.summary_report(
@@ -319,45 +373,46 @@ def summary(
             group_by=group_by_list,
         )
 
-        # Display summary
         if not report.groupEntries:
-            console.print("[yellow]ℹ[/yellow] No time entries found for the specified period.")
+            console.print("[yellow]ℹ[/yellow]  No time entries found for the specified period.")
             return
 
-        # Create table
-        table = Table(title=f"Summary Report {date_from} to {date_to}")
-        table.add_column("Name", style="cyan")
+        table = Table(
+            title=f"[bold]Summary Report[/bold]  [dim]{date_from} → {date_to}[/dim]",
+            box=box.ROUNDED,
+            border_style="dim",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("Name", style="white", min_width=20)
         table.add_column("Duration", style="green", justify="right")
         table.add_column("Billable", style="blue", justify="right")
 
-        def add_group_entry(entry, indent_level: int = 0) -> None:
-            prefix = "  " * indent_level
-            name = f"{prefix}{entry.name}" if indent_level > 0 else entry.name
-
-            # Sum duration and billable from nested entries
-            duration = entry.duration if entry.duration else 0
-            billable = entry.billableDuration if entry.billableDuration else 0
-
-            duration_str = _format_duration(duration // 1000)  # Clockify returns milliseconds
-            billable_str = _format_duration(billable // 1000)
-
-            table.add_row(name, duration_str, billable_str)
-
-            # Add nested entries recursively
-            if entry.children:
-                for child in entry.children:
-                    add_group_entry(child, indent_level + 1)
+        def add_entry(entry, indent: int = 0) -> None:
+            prefix = "  " * indent
+            name = f"{prefix}{entry.name}" if indent else entry.name
+            duration = _format_duration((entry.duration or 0) // 1000)
+            billable = _format_duration((entry.billableDuration or 0) // 1000)
+            name_style = "white" if indent else "bold white"
+            table.add_row(f"[{name_style}]{name}[/{name_style}]", duration, billable)
+            for child in (entry.children or []):
+                add_entry(child, indent + 1)
 
         for entry in report.groupEntries:
-            add_group_entry(entry)
+            add_entry(entry)
 
-        console.print(table)
-        total_duration = sum(e.duration or 0 for e in report.groupEntries) // 1000
-        total_billable = sum(e.billableDuration or 0 for e in report.groupEntries) // 1000
-        console.print(
-            f"\n[bold]Total:[/bold] {_format_duration(total_duration)} "
-            f"[bold]Billable:[/bold] {_format_duration(total_billable)}"
+        total_sec = sum((e.duration or 0) for e in report.groupEntries) // 1000
+        billable_sec = sum((e.billableDuration or 0) for e in report.groupEntries) // 1000
+        table.add_section()
+        table.add_row(
+            "[bold]Total[/bold]",
+            f"[bold green]{_format_duration(total_sec)}[/bold green]",
+            f"[bold blue]{_format_duration(billable_sec)}[/bold blue]",
         )
+
+        console.print()
+        console.print(table)
+        console.print()
 
     except ValueError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
@@ -369,30 +424,20 @@ def summary(
 
 @app.command()
 def detailed(
-    date_from: str = typer.Argument(
-        help="Start date (YYYY-MM-DD)"
-    ),
-    date_to: str = typer.Argument(
-        help="End date (YYYY-MM-DD)"
-    ),
-    project: str | None = typer.Option(
-        None, "--project", "-p", help="Filter by project name"
-    ),
-    tags: str | None = typer.Option(
-        None, "--tags", "-t", help="Filter by tag name"
-    ),
+    date_from: str = typer.Argument(help="Start date (YYYY-MM-DD)"),
+    date_to: str = typer.Argument(help="End date (YYYY-MM-DD)"),
+    project: str | None = typer.Option(None, "--project", "-p", help="Filter by project name"),
+    tags: str | None = typer.Option(None, "--tags", "-t", help="Filter by tag name"),
 ) -> None:
     """Fetch a detailed report for a date range.
 
     Examples:
-        homer clockify detailed 2024-01-01 2024-01-31
-        homer clockify detailed 2024-01-01 2024-01-31 --project "web-api"
+        homer ck detailed 2024-01-01 2024-01-31
+        homer ck detailed 2024-01-01 2024-01-31 --project "web-api"
     """
     try:
-        # Validate dates
         date_from = _validate_date(date_from)
         date_to = _validate_date(date_to)
-
         service = _get_service()
 
         report = service.detailed_report(
@@ -402,45 +447,47 @@ def detailed(
             tag_name=tags,
         )
 
-        # Display detailed entries
         if not report.totals or not report.totals.timeentries:
-            console.print("[yellow]ℹ[/yellow] No time entries found for the specified period.")
+            console.print("[yellow]ℹ[/yellow]  No time entries found for the specified period.")
             return
 
-        # Create table
-        table = Table(title=f"Detailed Report {date_from} to {date_to}")
-        table.add_column("Date", style="cyan")
-        table.add_column("Description", style="white")
+        table = Table(
+            title=f"[bold]Detailed Report[/bold]  [dim]{date_from} → {date_to}[/dim]",
+            box=box.ROUNDED,
+            border_style="dim",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("Date", style="dim", min_width=10)
+        table.add_column("Description", style="white", min_width=20)
         table.add_column("Project", style="blue")
+        table.add_column("Start", style="dim", justify="right")
+        table.add_column("End", style="dim", justify="right")
         table.add_column("Duration", style="green", justify="right")
-        table.add_column("Start", style="yellow")
-        table.add_column("End", style="yellow")
 
         total_duration = 0
 
         for entry in report.totals.timeentries:
-            entry_date = entry.timeInterval.start.split("T")[0] if "T" in entry.timeInterval.start else entry.timeInterval.start
-            desc = entry.description or "(no description)"
-
-            # Parse start/end times
+            date_part = entry.timeInterval.start.split("T")[0] if "T" in entry.timeInterval.start else entry.timeInterval.start
             start_time = entry.timeInterval.start.split("T")[1][:5] if "T" in entry.timeInterval.start else ""
-            end_time = entry.timeInterval.end.split("T")[1][:5] if "T" in entry.timeInterval.end else ""
-
-            duration = entry.duration if entry.duration else 0
+            end_time = entry.timeInterval.end.split("T")[1][:5] if entry.timeInterval.end and "T" in entry.timeInterval.end else ""
+            duration = entry.duration or 0
             total_duration += duration
-            duration_str = _format_duration(duration // 1000)
-
             table.add_row(
-                entry_date,
-                desc[:40],  # Truncate long descriptions
-                entry.projectId or "-",
-                duration_str,
+                date_part,
+                (entry.description or "(no description)")[:45],
+                entry.projectId or "—",
                 start_time,
                 end_time,
+                _format_duration(duration // 1000),
             )
 
+        table.add_section()
+        table.add_row("", "[bold]Total[/bold]", "", "", "", f"[bold green]{_format_duration(total_duration // 1000)}[/bold green]")
+
+        console.print()
         console.print(table)
-        console.print(f"\n[bold]Total Duration:[/bold] {_format_duration(total_duration // 1000)}")
+        console.print()
 
     except ValueError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
@@ -448,3 +495,4 @@ def detailed(
     except ClockifyError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
         raise typer.Exit(code=1)
+

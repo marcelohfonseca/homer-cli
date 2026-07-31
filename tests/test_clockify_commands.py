@@ -52,7 +52,7 @@ class TestStartCommand:
                     result = runner.invoke(app, ["start", "Work"])
 
         assert result.exit_code == 0
-        assert "Timer started" in result.output
+        assert "Timer Started" in result.output
         assert "Work" in result.output
 
     def test_starts_timer_with_project_and_tags(

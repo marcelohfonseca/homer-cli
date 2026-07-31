@@ -127,7 +127,7 @@ class TestCreateCommand:
 
         assert result.exit_code == 0
         assert "NDI-456" in result.output
-        assert "Issue created" in result.output
+        assert "Issue Created" in result.output
 
     def test_creates_issue_with_options(self, runner: CliRunner) -> None:
         mock_issue = Issue(
@@ -192,7 +192,7 @@ class TestCommentCommand:
                 )
 
         assert result.exit_code == 0
-        assert "Comment added" in result.output
+        assert "Comment Added" in result.output
         assert "NDI-123" in result.output
 
 
@@ -226,4 +226,4 @@ class TestMentionCommand:
                 )
 
         assert result.exit_code == 0
-        assert "Comment added" in result.output
+        assert "Mention Sent" in result.output

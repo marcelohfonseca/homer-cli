@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING
 
 import typer
 from rich.console import Console
-from rich.table import Table
+from rich.panel import Panel
+from rich.table import Table, box
+from rich.text import Text
 
 from homer.config import get_settings
 from homer.jira.service import JiraService
@@ -22,22 +24,51 @@ app = typer.Typer(
 )
 console = Console()
 
+# Priority → colour mapping
+_PRIORITY_STYLE: dict[str, str] = {
+    "Highest": "bold red",
+    "High": "red",
+    "Medium": "yellow",
+    "Low": "cyan",
+    "Lowest": "dim cyan",
+}
+
+# Status → colour mapping
+_STATUS_STYLE: dict[str, str] = {
+    "To Do": "dim",
+    "In Progress": "bold yellow",
+    "In Review": "bold cyan",
+    "Done": "green",
+    "Blocked": "bold red",
+}
+
+
+def _priority(value: str) -> Text:
+    style = _PRIORITY_STYLE.get(value, "white")
+    return Text(value, style=style)
+
+
+def _status(value: str) -> Text:
+    style = _STATUS_STYLE.get(value, "white")
+    return Text(value, style=style)
+
+
+def _kv_table(*rows: tuple[str, str]) -> Table:
+    t = Table.grid(padding=(0, 2))
+    t.add_column(style="dim", min_width=11)
+    t.add_column()
+    for key, value in rows:
+        t.add_row(key, value)
+    return t
+
 
 def _get_service() -> JiraService:
-    """Get a configured JiraService.
-
-    Returns:
-        Initialized service ready to use.
-
-    Raises:
-        typer.Exit: With error message if configuration is missing.
-    """
+    """Get a configured JiraService."""
     try:
         settings = get_settings()
     except ConfigurationError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
         raise typer.Exit(code=1)
-
     return JiraService.from_settings(settings)
 
 
@@ -53,29 +84,32 @@ def list() -> None:
         issues = service.list_my_issues()
 
         if not issues:
-            console.print("[yellow]ℹ[/yellow] No open issues assigned to you")
+            console.print("[yellow]ℹ[/yellow]  No open issues assigned to you")
             return
 
-        # Create table
-        table = Table(title="Your Open Issues")
-        table.add_column("Key", style="cyan")
-        table.add_column("Summary", style="white")
-        table.add_column("Status", style="blue")
-        table.add_column("Priority", style="yellow")
-        table.add_column("Assignee", style="green")
+        table = Table(
+            title=f"[bold]Your Open Issues[/bold]  [dim]({len(issues)} total)[/dim]",
+            box=box.ROUNDED,
+            border_style="dim",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("Key", style="cyan bold", min_width=10)
+        table.add_column("Summary", style="white", min_width=30)
+        table.add_column("Status", min_width=12)
+        table.add_column("Priority", min_width=8)
 
         for issue in issues:
-            assignee_name = issue.assignee.displayName if issue.assignee else "-"
             table.add_row(
                 issue.key,
-                issue.summary[:50],  # Truncate long summaries
-                issue.status,
-                issue.priority,
-                assignee_name,
+                issue.summary[:55],
+                _status(issue.status),
+                _priority(issue.priority),
             )
 
+        console.print()
         console.print(table)
-        console.print(f"\n[bold]Total:[/bold] {len(issues)} open issues")
+        console.print()
 
     except JiraError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
@@ -93,21 +127,40 @@ def view(key: str = typer.Argument(help="Issue key (e.g., NDI-123)")) -> None:
         service = _get_service()
         issue = service.view_issue(key)
 
-        console.print(f"\n[bold cyan]{issue.key}[/bold cyan] {issue.summary}")
-        console.print("[dim]" + "─" * 80 + "[/dim]")
+        # Header line: KEY · Summary
+        header = Text()
+        header.append(f"{issue.key}", style="bold cyan")
+        header.append("  ")
+        header.append(issue.summary, style="bold white")
 
-        # Display fields
-        console.print(f"\n[bold]Status:[/bold] {issue.status}")
-        console.print(f"[bold]Priority:[/bold] {issue.priority}")
-
+        kv_rows: list[tuple[str, str]] = [
+            ("Status",   f"[{_STATUS_STYLE.get(issue.status, 'white')}]{issue.status}[/]"),
+            ("Priority", f"[{_PRIORITY_STYLE.get(issue.priority, 'white')}]{issue.priority}[/]"),
+            ("Project",  issue.project_key),
+        ]
         if issue.assignee:
-            console.print(f"[bold]Assignee:[/bold] {issue.assignee.displayName}")
+            kv_rows.append(("Assignee", issue.assignee.displayName))
 
-        console.print(f"[bold]Project:[/bold] {issue.project_key}")
+        content = Table.grid(padding=(0, 0))
+        content.add_row(header)
+        content.add_row("")
+        content.add_row(_kv_table(*kv_rows))
 
         if issue.description:
-            console.print(f"\n[bold]Description:[/bold]")
-            console.print(issue.description)
+            content.add_row("")
+            content.add_row(Text("Description", style="dim"))
+            content.add_row(Text(issue.description[:500], style="white"))
+
+        console.print()
+        console.print(
+            Panel(
+                content,
+                border_style="cyan",
+                expand=False,
+                padding=(1, 2),
+            )
+        )
+        console.print()
 
     except JiraError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
@@ -117,28 +170,17 @@ def view(key: str = typer.Argument(help="Issue key (e.g., NDI-123)")) -> None:
 @app.command()
 def create(
     summary: str = typer.Argument(help="Issue summary"),
-    project: str | None = typer.Option(
-        "NDI", "--project", "-p", help="Project key"
-    ),
-    issue_type: str | None = typer.Option(
-        "Story", "--type", "-t", help="Issue type (Story, Bug, Task, etc.)"
-    ),
-    description: str | None = typer.Option(
-        None, "--description", "-d", help="Issue description"
-    ),
-    assignee: str | None = typer.Option(
-        None, "--assignee", "-a", help="Assignee account ID (or will default to you)"
-    ),
-    priority: str | None = typer.Option(
-        None, "--priority", help="Priority (Highest, High, Medium, Low, Lowest)"
-    ),
+    project: str | None = typer.Option("NDI", "--project", "-p", help="Project key"),
+    issue_type: str | None = typer.Option("Story", "--type", "-t", help="Issue type (Story, Bug, Task, …)"),
+    description: str | None = typer.Option(None, "--description", "-d", help="Issue description"),
+    assignee: str | None = typer.Option(None, "--assignee", "-a", help="Assignee account ID"),
+    priority: str | None = typer.Option(None, "--priority", help="Priority (Highest, High, Medium, Low, Lowest)"),
 ) -> None:
     """Create a new issue.
 
     Examples:
         homer jira create "Fix login bug"
         homer jira create "Update docs" --type Task --priority High
-        homer jira create "Write tests" --project WEB --description "Add tests for API"
     """
     try:
         service = _get_service()
@@ -151,8 +193,28 @@ def create(
             priority=priority,
         )
 
-        console.print(f"[green]✓[/green] Issue created: [bold cyan]{issue.key}[/bold cyan]")
-        console.print(f"[dim]{issue.summary}[/dim]")
+        rows: list[tuple[str, str]] = [
+            ("Key",     f"[bold cyan]{issue.key}[/bold cyan]"),
+            ("Type",    issue_type or "Story"),
+            ("Project", project or "NDI"),
+        ]
+        if priority:
+            rows.append(("Priority", f"[{_PRIORITY_STYLE.get(priority, 'white')}]{priority}[/]"))
+
+        content = Table.grid(padding=(0, 0))
+        content.add_row(Text(issue.summary, style="bold white"))
+        content.add_row("")
+        content.add_row(_kv_table(*rows))
+
+        console.print(
+            Panel(
+                content,
+                title="[bold green]✓  Issue Created[/bold green]",
+                border_style="green",
+                expand=False,
+                padding=(1, 2),
+            )
+        )
 
     except JiraError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
@@ -168,14 +230,26 @@ def comment(
 
     Examples:
         homer jira comment NDI-123 "This is done"
-        homer jira comment WEB-45 "Ready for QA"
     """
     try:
         service = _get_service()
         result = service.comment_issue(issue_key, message)
 
-        console.print(f"[green]✓[/green] Comment added to [bold cyan]{issue_key}[/bold cyan]")
-        console.print(f"[dim]{result.author.displayName}: {message}[/dim]")
+        content = _kv_table(
+            ("Issue",  f"[bold cyan]{issue_key}[/bold cyan]"),
+            ("Author", result.author.displayName),
+            ("",       f"[dim]{message}[/dim]"),
+        )
+
+        console.print(
+            Panel(
+                content,
+                title="[bold green]✓  Comment Added[/bold green]",
+                border_style="green",
+                expand=False,
+                padding=(1, 2),
+            )
+        )
 
     except JiraError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
@@ -192,15 +266,29 @@ def mention(
 
     Examples:
         homer jira mention NDI-123 "John" "Can you review this?"
-        homer jira mention WEB-45 "alice" "Please approve"
     """
     try:
         service = _get_service()
         result = service.mention_user(issue_key, username, message)
 
-        console.print(f"[green]✓[/green] Comment added to [bold cyan]{issue_key}[/bold cyan]")
-        console.print(f"[dim]{result.author.displayName}: {message}[/dim]")
+        content = _kv_table(
+            ("Issue",     f"[bold cyan]{issue_key}[/bold cyan]"),
+            ("Mentioned", f"[cyan]@{username}[/cyan]"),
+            ("Author",    result.author.displayName),
+            ("",          f"[dim]{message}[/dim]"),
+        )
+
+        console.print(
+            Panel(
+                content,
+                title="[bold green]✓  Mention Sent[/bold green]",
+                border_style="green",
+                expand=False,
+                padding=(1, 2),
+            )
+        )
 
     except JiraError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
         raise typer.Exit(code=1)
+
