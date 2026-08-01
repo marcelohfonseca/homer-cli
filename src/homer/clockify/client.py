@@ -206,7 +206,9 @@ class ClockifyClient:
         Raises:
             ClockifyError: On API failure.
         """
-        url = f"{self.BASE_URL}/workspaces/{self.workspace_id}/user/{self.user_id}/time-entries?in-progress=true"
+        # Correct endpoint: /time-entries/in-progress (path suffix, not query param).
+        # user_id must be the alphanumeric Clockify user ID, never an email address.
+        url = f"{self.BASE_URL}/workspaces/{self.workspace_id}/user/{self.user_id}/time-entries/in-progress"
         try:
             response = httpx.get(url, headers=self._headers(), timeout=10.0)
             response.raise_for_status()

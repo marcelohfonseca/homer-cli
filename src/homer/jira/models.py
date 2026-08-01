@@ -117,20 +117,34 @@ class Comment(BaseModel):
 
     id: str = Field(description="Comment ID")
     author: User = Field(description="Comment author")
-    body: str = Field(description="Comment text")
+    body: dict | str = Field(description="Comment body (ADF object in API v3)")
     created: str | datetime = Field(description="Creation timestamp")
     updated: str | datetime = Field(description="Last update timestamp")
 
+    @property
+    def text(self) -> str:
+        """Extract plain text from ADF body or return raw if string."""
+        if isinstance(self.body, str):
+            return self.body
+        # Walk ADF tree and collect text nodes
+        parts: list[str] = []
+        for block in self.body.get("content", []):
+            for node in block.get("content", []):
+                if node.get("type") == "text":
+                    parts.append(node.get("text", ""))
+        return "".join(parts)
+
 
 class SearchResult(BaseModel):
-    """Search results from JQL query."""
+    """Search results from JQL query (POST /search/jql)."""
 
     issues: list[Issue] = Field(description="Matching issues")
-    total: int = Field(description="Total number of matching issues")
-    startAt: int = Field(description="Starting index")
-    maxResults: int = Field(description="Maximum results returned")
+    total: int = Field(default=0, description="Total results (may be absent in POST /search/jql)")
+    startAt: int = Field(default=0, description="Starting index")
+    maxResults: int = Field(default=0, description="Max results (may be absent in POST /search/jql)")
+    isLast: bool = Field(default=True, description="Whether this is the last page")
 
     @property
     def has_more(self) -> bool:
         """Check if more results are available."""
-        return self.startAt + self.maxResults < self.total
+        return not self.isLast

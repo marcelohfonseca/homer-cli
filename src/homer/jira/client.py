@@ -51,14 +51,15 @@ class JiraClient:
         self,
         jql: str,
         max_results: int = 50,
-        start_at: int = 0,
     ) -> SearchResult:
         """Search issues by JQL query.
+
+        Uses the POST /search/jql endpoint (the old GET /search was removed
+        by Atlassian in 2025 — returns 410 Gone).
 
         Args:
             jql: Jira Query Language string.
             max_results: Maximum results to return.
-            start_at: Starting index for pagination.
 
         Returns:
             Search result with matched issues.
@@ -66,19 +67,18 @@ class JiraClient:
         Raises:
             JiraError: On API failure.
         """
-        url = f"{self.base_url}/rest/api/3/search"
-        params = {
+        url = f"{self.base_url}/rest/api/3/search/jql"
+        payload = {
             "jql": jql,
             "maxResults": max_results,
-            "startAt": start_at,
-            "fields": "summary,description,status,priority,assignee,issuetype,project",
+            "fields": ["summary", "description", "status", "priority", "assignee", "issuetype", "project"],
         }
 
         try:
-            response = httpx.get(
+            response = httpx.post(
                 url,
                 headers=self._headers(),
-                params=params,
+                json=payload,
                 timeout=10.0,
             )
             response.raise_for_status()
@@ -175,7 +175,20 @@ class JiraClient:
             JiraError: On API failure.
         """
         url = f"{self.base_url}/rest/api/3/issue/{issue_key}/comment"
-        payload = {"body": body}
+        # Jira API v3 requires Atlassian Document Format (ADF) for comment bodies.
+        # Plain strings are rejected with 400 Bad Request.
+        payload = {
+            "body": {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [{"type": "text", "text": body}],
+                    }
+                ],
+            }
+        }
 
         try:
             response = httpx.post(
