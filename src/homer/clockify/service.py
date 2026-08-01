@@ -136,36 +136,48 @@ class ClockifyService:
         projects = self.client.get_projects()
         return sorted(p.name for p in projects)
 
-    def _resolve_or_create_project(self, name: str) -> str:
+    def _resolve_or_create_project(self, name: str) -> str | None:
         """Resolve a project name to ID, creating it if necessary.
 
-        Searches for an exact or partial name match. If not found, creates
-        a new project with the given name.
+        Tries exact match, then partial match, then Jira-key match (e.g.
+        "[NDI-11069] Title" → looks for any project containing "NDI-11069").
+        If nothing matches and creation fails (e.g. no permission), returns
+        None so the timer can still start without a project.
 
         Args:
             name: Project name to find or create.
 
         Returns:
-            Project ID.
-
-        Raises:
-            ClockifyError: If lookup or creation fails.
+            Project ID, or None if not found and cannot be created.
         """
+        import re
+
         projects = self.client.get_projects()
 
-        # Try exact match first
+        # Exact match
         for proj in projects:
             if proj.name == name:
                 return proj.id
 
-        # Try partial match (project name contains search term)
+        # Partial match (search term is substring of project name)
         for proj in projects:
             if name in proj.name:
                 return proj.id
 
-        # Not found; create it
-        new_project = self.client.create_project(name)
-        return new_project.id
+        # Jira-key match: extract key like "NDI-12345" from "[NDI-12345] Title"
+        jira_key_match = re.search(r"\b([A-Z]+-\d+)\b", name)
+        if jira_key_match:
+            key = jira_key_match.group(1)
+            for proj in projects:
+                if key in proj.name:
+                    return proj.id
+
+        # Not found — try to create; if not allowed, return None (no project)
+        try:
+            new_project = self.client.create_project(name)
+            return new_project.id
+        except ClockifyError:
+            return None
 
     def _resolve_or_create_tags(self, names: list[str]) -> list[str]:
         """Resolve tag names to IDs, creating them if necessary.

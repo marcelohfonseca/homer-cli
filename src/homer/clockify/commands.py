@@ -129,8 +129,8 @@ def _prompt_project(service: ClockifyService) -> str | None:
         jira_service = JiraService.from_settings(settings)
         issues = jira_service.list_my_issues()
         for issue in issues:
-            label = f"{issue.key} · {issue.summary}"
-            choices.append((label, label))
+            label = f"[{issue.key}] {issue.summary}"
+            choices.append((f"{issue.key} · {issue.summary[:60]}", label))
     except Exception:
         pass  # Jira not configured or unavailable — non-fatal
 
@@ -215,8 +215,17 @@ def start(
             tag_names=tag_list,
         )
 
+        # Warn if a project was requested but couldn't be resolved/created
+        project_resolved = entry.projectId is not None
+        if resolved_project and not project_resolved:
+            console.print(
+                f"[yellow]⚠[/yellow]  Project [dim]{resolved_project!r}[/dim] not found and could not be created "
+                f"(no permission). Timer started without a project.",
+                highlight=False,
+            )
+
         rows: list[tuple[str, str]] = [("Description", entry.description or "")]
-        if resolved_project:
+        if project_resolved and resolved_project:
             rows.append(("Project", resolved_project))
         if tag_list:
             rows.append(("Tags", "  ".join(f"[cyan]#{t}[/cyan]" for t in tag_list)))
