@@ -37,7 +37,7 @@ console = Console()
 from homer.clockify.commands import app as clockify_app
 from homer.jira.commands import app as jira_app
 
-app.add_typer(clockify_app, name="clockify")
+app.add_typer(clockify_app, name="clockify", hidden=True)
 app.add_typer(clockify_app, name="ck", hidden=False)
 app.add_typer(jira_app, name="jira")
 
