@@ -45,7 +45,7 @@ class TimeEntry(BaseModel):
     timeInterval: TimeInterval = Field(description="Time interval")
     description: str | None = Field(default=None, description="Entry description")
     projectId: str | None = Field(default=None, description="Associated project ID")
-    tagIds: list[str] = Field(default_factory=list, description="Associated tag IDs")
+    tagIds: list[str] | None = Field(default_factory=list, description="Associated tag IDs")
     billable: bool = Field(default=True, description="Whether the entry is billable")
     type: str = Field(default="REGULAR", description="Entry type")
 
