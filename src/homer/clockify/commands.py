@@ -246,7 +246,7 @@ def start(
         help="Comma-separated tag names. Pass empty string or '-t \"\"' to open interactive tag selector.",
     ),
     select: bool = typer.Option(
-        False, "--select", "-s",
+        False, "--select", "-P",
         help="Open interactive project selector even when not passing -p.",
     ),
     select_tags: bool = typer.Option(
@@ -257,14 +257,15 @@ def start(
     """Start a new timer.
 
     By default starts immediately without prompting for a project or tags.
-    Use -p / -s to set or select a project; use -t / -T to set or select tags.
+    Use -p / -P to set or select a project; use -t / -T to set or select tags.
 
     Examples:
         homer ck start "Fixing login bug"
         homer ck start "Code review" -p "Web API"
-        homer ck start "Code review" -s
+        homer ck start "Code review" -P
         homer ck start "Code review" -T
         homer ck start "Code review" -p "" -t ""
+        homer ck start "Code review" -P -T
     """
     try:
         service = _get_service()

@@ -37,7 +37,7 @@ Opens a numbered list combining Clockify projects and your open Jira issues:
 
 ```bash
 homer ck start "Task" -p ""    # -p with empty string
-homer ck start "Task" -s       # --select flag
+homer ck start "Task" -P       # --select flag
 ```
 
 Pick by number, type a free-form name, or press Enter to skip.
@@ -57,7 +57,7 @@ Pick multiple tags: `1,3` — or type a new tag name.
 
 ```bash
 homer ck start "Task" -p "" -T     # open both selectors
-homer ck start "Task" -s -T        # flags form
+homer ck start "Task" -P -T        # flags form
 ```
 
 ### Check current timer

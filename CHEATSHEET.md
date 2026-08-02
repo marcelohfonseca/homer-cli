@@ -16,7 +16,7 @@ homer --version
 homer ck start "Description"                    # start timer
 homer ck start "Description" -p "project"       # with project name or Jira key
 homer ck start "Description" -p ""              # open project selector
-homer ck start "Description" -s                 # same as -p ""
+homer ck start "Description" -P                 # same as -p ""
 homer ck start "Description" -t "tag1,tag2"     # with tags
 homer ck start "Description" -t ""              # open tag selector
 homer ck start "Description" -T                 # same as -t ""
@@ -64,6 +64,6 @@ nano ~/.env         # edit manually
 
 - Dates: always `YYYY-MM-DD`
 - `-p "NDI-12345"` fetches Jira summary and creates `[NDI-12345] Summary` as a Clockify project
-- `-p ""` or `-s` opens selector (Clockify projects + open Jira issues)
+- `-p ""` or `-P` opens selector (Clockify projects + open Jira issues)
 - `-t ""` or `-T` opens tag selector (Clockify tags)
 - Tag selector: pick multiple with `1,3,5` or type free-form names

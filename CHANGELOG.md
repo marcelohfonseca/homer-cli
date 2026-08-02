@@ -1,3 +1,9 @@
+## 0.2.1 (2026-08-02)
+
+### Refactor
+
+- rename -s to -P for project selector; update AGENTS.md
+
 ## 0.2.0 (2026-08-02)
 
 ### Feat
