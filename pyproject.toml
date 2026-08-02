@@ -1,6 +1,6 @@
 [project]
 name = "homer-cli"
-version = "0.1.7"
+version = "0.1.8"
 description = "Homer is a personal productivity CLI that helps developers automate their daily workflow."
 authors = [
     {name = "Marcelo Henrique Fonseca",email = "dev@marcelofonseca.me"},
