@@ -54,4 +54,5 @@ testpaths = ["tests"]
 [dependency-groups]
 dev = [
     "pytest>=8",
+    "commitizen>=4.17.0",
 ]
