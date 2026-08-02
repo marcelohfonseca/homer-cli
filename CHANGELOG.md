@@ -1,3 +1,9 @@
+## 0.1.10 (2026-08-02)
+
+### Fix
+
+- create project with isPublic=true; resolve bare Jira key before creating
+
 ## 0.1.9 (2026-08-02)
 
 ### Fix
