@@ -48,6 +48,11 @@ version_provider = "pep621"
 update_changelog_on_bump = true
 major_version_zero = true
 
+[[tool.commitizen.bump_files]]
+filename = "src/homer/__init__.py"
+search = "__version__ = \".*\""
+replace = "__version__ = \"$new_version\""
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
