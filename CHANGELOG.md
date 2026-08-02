@@ -1,3 +1,9 @@
+## 0.2.3 (2026-08-02)
+
+### Fix
+
+- sync __version__ to 0.2.2 and configure commitizen to update __init__.py
+
 ## 0.2.2 (2026-08-02)
 
 ### Fix
