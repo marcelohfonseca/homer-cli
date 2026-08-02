@@ -1,6 +1,6 @@
 [project]
 name = "homer-cli"
-version = "0.2.2"
+version = "0.2.3"
 description = "Homer is a personal productivity CLI that helps developers automate their daily workflow."
 authors = [
     {name = "Marcelo Henrique Fonseca",email = "dev@marcelofonseca.me"},
@@ -47,6 +47,9 @@ version_scheme = "pep440"
 version_provider = "pep621"
 update_changelog_on_bump = true
 major_version_zero = true
+version_files = [
+    "src/homer/__init__.py:__version__"
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
