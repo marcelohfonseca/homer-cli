@@ -1,108 +1,69 @@
 # Homer Cheatsheet
 
-Quick reference for Homer commands.
+> `homer ck` and `homer clockify` are equivalent.
 
 ## Setup
 
 ```bash
-# Install (recommended)
 pipx install homer-cli
-
-# or with pip
-pip install homer-cli
-
-# Configure
-homer init
-
-# Verify
+homer init              # configure credentials (~/.env)
 homer --version
-homer --help
 ```
 
-## Clockify Timers
+## Clockify — Timers
 
 ```bash
-# Start timer
-homer clockify start "Task description"
-homer clockify start "Task" --project "project-name" --tags "tag1,tag2"
+homer ck start "Description"                    # start timer
+homer ck start "Description" -p "project"       # with project name or Jira key
+homer ck start "Description" -p ""              # open project selector
+homer ck start "Description" -s                 # same as -p ""
+homer ck start "Description" -t "tag1,tag2"     # with tags
+homer ck start "Description" -t ""              # open tag selector
+homer ck start "Description" -T                 # same as -t ""
+homer ck start "Description" -p "" -T           # both selectors
 
-# Check current
-homer clockify current
-
-# Stop timer
-homer clockify stop
+homer ck current                                # show running timer
+homer ck stop                                   # stop all timers
 ```
 
-## Clockify Reports
+## Clockify — Reports
 
 ```bash
-# Summary (by project)
-homer clockify summary 2024-01-01 2024-01-31
+homer ck summary  2026-01-01 2026-01-31         # summary by project
+homer ck summary  2026-01-01 2026-01-31 -g DATE # group by date
+homer ck summary  2026-01-01 2026-01-31 -g TAG  # group by tag
+homer ck summary  2026-01-01 2026-01-31 -p NAME # filter by project
+homer ck summary  2026-01-01 2026-01-31 -t NAME # filter by tag
 
-# By date
-homer clockify summary 2024-01-01 2024-01-31 --group-by DATE
-
-# By project filter
-homer clockify summary 2024-01-01 2024-01-31 --project "web-api"
-
-# Detailed entries
-homer clockify detailed 2024-01-01 2024-01-31
+homer ck detailed 2026-01-01 2026-01-31         # detailed entries
+homer ck detailed 2026-01-01 2026-01-31 -p NAME # filter by project
 ```
 
-## Jira Issues
+## Jira
 
 ```bash
-# List your issues
-homer jira list
+homer jira list                                       # open issues assigned to you
+homer jira view NDI-123                               # issue details
 
-# View issue
-homer jira view NDI-123
+homer jira create "Summary"                           # create issue (defaults)
+homer jira create "Summary" -p NDI -t Bug --priority High -d "Details"
 
-# Create issue
-homer jira create "Issue title"
-homer jira create "Title" --type Story --priority High --description "Details"
-
-# Comment on issue
-homer jira comment NDI-123 "Comment text"
-
-# Mention user
-homer jira mention NDI-123 "username" "Message text"
+homer jira comment NDI-123 "Message"                  # add comment
+homer jira mention NDI-123 "username" "Message"       # mention user in comment
 ```
 
 ## Configuration
 
 ```bash
-# Initialize/update
-homer init
-
-# View config
-cat ~/.env
-
-# Edit config
-nano ~/.env
+homer init          # interactive update (preserves existing values)
+cat ~/.env          # view current config
+nano ~/.env         # edit manually
 ```
 
 ## Tips
 
-- **Dates:** Always use `YYYY-MM-DD` format
-- **Projects:** Use exact project names (case-sensitive)
-- **Tags:** Must exist in Clockify (auto-create enabled)
-- **Jira users:** First match wins in searches
-- **Report groups:** DATE, PROJECT, TAG
-
-## Troubleshooting
-
-```bash
-# Test Clockify
-homer clockify current
-
-# Test Jira
-homer jira list
-
-# Check install
-homer --help
-homer clockify --help
-homer jira --help
-```
-
-**Full documentation:** See README.md and other docs.
+- Dates: always `YYYY-MM-DD`
+- `-p "NDI-12345"` fetches Jira summary and creates `[NDI-12345] Summary` as a Clockify project
+- `-p ""` or `-s` opens selector (Clockify projects + open Jira issues)
+- `-t ""` or `-T` opens tag selector (Clockify tags)
+- Tag selector: pick multiple with `1,3,5` or type free-form names
