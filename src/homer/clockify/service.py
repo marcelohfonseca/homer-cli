@@ -11,6 +11,7 @@ from homer.exceptions import ClockifyError
 
 if TYPE_CHECKING:
     from homer.config import Settings
+    from homer.jira.client import JiraClient
 
 
 class ClockifyService:
@@ -21,13 +22,15 @@ class ClockifyService:
     Never prints — all output is handled by CLI commands.
     """
 
-    def __init__(self, client: ClockifyClient) -> None:
+    def __init__(self, client: ClockifyClient, jira_client: JiraClient | None = None) -> None:
         """Initialize the service with a client.
 
         Args:
             client: ClockifyClient instance for API access.
+            jira_client: Optional JiraClient for resolving Jira issue keys to project names.
         """
         self.client = client
+        self.jira_client = jira_client
         self._projects_cache: dict[str, str] | None = None
         self._tags_cache: dict[str, str] | None = None
 
@@ -41,8 +44,14 @@ class ClockifyService:
         Returns:
             Initialized ClockifyService.
         """
+        from homer.jira.client import JiraClient
+
         client = ClockifyClient(settings)
-        return cls(client)
+        try:
+            jira_client = JiraClient(settings)
+        except Exception:
+            jira_client = None
+        return cls(client, jira_client)
 
     def start_timer(
         self,
@@ -136,16 +145,28 @@ class ClockifyService:
         projects = self.client.get_projects()
         return sorted(p.name for p in projects)
 
+    def list_tags(self) -> list[str]:
+        """Return names of all existing Clockify tags.
+
+        Returns:
+            Sorted list of tag names.
+
+        Raises:
+            ClockifyError: On API failure.
+        """
+        tags = self.client.get_tags()
+        return sorted(t.name for t in tags)
+
     def _resolve_or_create_project(self, name: str) -> str | None:
         """Resolve a project name to ID, creating it if necessary.
 
-        Tries exact match, then partial match, then Jira-key match (e.g.
-        "[NDI-11069] Title" → looks for any project containing "NDI-11069").
-        If nothing matches and creation fails (e.g. no permission), returns
-        None so the timer can still start without a project.
+        Tries exact match, then partial match, then Jira-key match.
+        If ``name`` looks like a bare Jira key (e.g. ``NDI-12345``), fetches
+        the issue summary from Jira and uses ``[KEY] Summary`` as the project
+        name to create — mirroring the legacy PowerShell behaviour.
 
         Args:
-            name: Project name to find or create.
+            name: Project name or bare Jira key to find or create.
 
         Returns:
             Project ID, or None if not found and cannot be created.
@@ -172,7 +193,16 @@ class ClockifyService:
                 if key in proj.name:
                     return proj.id
 
-        # Not found — try to create; if not allowed, return None (no project)
+        # If the whole input is a bare Jira key, resolve via Jira to get the
+        # canonical "[KEY] Summary" project name before creating it.
+        bare_key_match = re.fullmatch(r"[A-Z]+-\d+", name.strip())
+        if bare_key_match and self.jira_client:
+            try:
+                issue = self.jira_client.get_issue(name.strip())
+                name = f"[{issue.key}] {issue.fields.summary}"
+            except Exception:
+                pass  # Fall through and create with the original name
+
         try:
             new_project = self.client.create_project(name)
             return new_project.id

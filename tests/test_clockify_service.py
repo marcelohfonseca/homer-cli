@@ -297,17 +297,11 @@ class TestSummaryReport:
     def test_fetches_summary_report(
         self, service: ClockifyService, mock_client: MagicMock
     ) -> None:
-        from homer.clockify.models import GroupEntry, ReportSummary
+        from homer.clockify.models import ReportSummary
 
         mock_report = ReportSummary(
-            groupEntries=[
-                GroupEntry(
-                    name="Web API",
-                    duration=3600000,
-                    billableDuration=3600000,
-                    children=[],
-                )
-            ]
+            groupOne=[{"name": "Web API", "duration": 3600, "_id": "p-1"}],
+            totals=[{"totalTime": 3600, "totalBillableTime": 3600, "entriesCount": 1}],
         )
         mock_client.summary_report.return_value = mock_report
 
@@ -316,18 +310,18 @@ class TestSummaryReport:
             date_to="2026-08-31",
         )
 
-        assert len(result.groupEntries) == 1
-        assert result.groupEntries[0].name == "Web API"
+        assert len(result.groupOne) == 1
+        assert result.groupOne[0]["name"] == "Web API"
 
     def test_resolves_project_name_to_id(
         self, service: ClockifyService, mock_client: MagicMock
     ) -> None:
-        from homer.clockify.models import GroupEntry, ReportSummary
+        from homer.clockify.models import ReportSummary
 
         project = Project(id="p-1", name="Web API")
         mock_client.get_projects.return_value = [project]
 
-        mock_report = ReportSummary(groupEntries=[])
+        mock_report = ReportSummary(groupOne=[], totals=[])
         mock_client.summary_report.return_value = mock_report
 
         service.summary_report(
@@ -343,12 +337,12 @@ class TestSummaryReport:
     def test_resolves_tag_name_to_id(
         self, service: ClockifyService, mock_client: MagicMock
     ) -> None:
-        from homer.clockify.models import GroupEntry, ReportSummary
+        from homer.clockify.models import ReportSummary
 
         tag = Tag(id="t-1", name="urgent")
         mock_client.get_tags.return_value = [tag]
 
-        mock_report = ReportSummary(groupEntries=[])
+        mock_report = ReportSummary(groupOne=[], totals=[])
         mock_client.summary_report.return_value = mock_report
 
         service.summary_report(

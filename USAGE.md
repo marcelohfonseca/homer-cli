@@ -1,542 +1,251 @@
 # Usage Guide
 
-Comprehensive guide for using Homer's features.
-
 ## Table of Contents
 
-- [Clockify Timer](#clockify-timer)
+- [Clockify Timers](#clockify-timers)
 - [Clockify Reports](#clockify-reports)
 - [Jira Issues](#jira-issues)
-- [Advanced Tips](#advanced-tips)
+- [Typical Workflows](#typical-workflows)
+
+> Both `homer clockify` and `homer ck` work — `ck` is the short alias.
 
 ---
 
-## Clockify Timer
+## Clockify Timers
 
-### Starting a Timer
+### Start a timer
 
-Basic usage - just a description:
 ```bash
-homer clockify start "Implementing user authentication"
+homer ck start "Fixing login bug"
 ```
 
-With project and tags:
+With a project:
 ```bash
-homer clockify start "Code review" \
-  --project "web-api" \
-  --tags "review,urgent"
+homer ck start "Code review" -p "web-api"
+homer ck start "Code review" -p "NDI-12345"   # bare Jira key → fetches summary → creates [NDI-12345] Summary
 ```
 
-With multiple tags:
+With tags:
 ```bash
-homer clockify start "Backend work" \
-  --project "mobile-app" \
-  --tags "api,backend,production"
+homer ck start "Standup" -t "meetings"
+homer ck start "Feature work" -t "backend,feature"
 ```
 
-The timer starts immediately. If the project or tags don't exist, Homer creates them automatically.
+### Interactive project selector
 
-### Checking Current Timer
+Opens a numbered list combining Clockify projects and your open Jira issues:
 
-See what you're currently working on:
 ```bash
-homer clockify current
+homer ck start "Task" -p ""    # -p with empty string
+homer ck start "Task" -s       # --select flag
 ```
 
-Output shows:
-- Timer status (Active)
-- Description
-- Elapsed time
-- Project and tags (if set)
+Pick by number, type a free-form name, or press Enter to skip.
 
-If no timer is running, you'll see:
-```
-ℹ No timer running
-```
+### Interactive tag selector
 
-### Stopping Timers
+Opens a numbered list of existing Clockify tags. Supports comma-separated multi-selection:
 
-Stop all running timers:
 ```bash
-homer clockify stop
+homer ck start "Task" -t ""    # -t with empty string
+homer ck start "Task" -T       # --select-tags flag
 ```
 
-Output shows:
-- What stopped
-- Total time worked
-- Project and tags
+Pick multiple tags: `1,3` — or type a new tag name.
 
-You can stop multiple timers at once:
+### Combine selectors
+
 ```bash
-# Stops all running timers
-homer clockify stop
+homer ck start "Task" -p "" -T     # open both selectors
+homer ck start "Task" -s -T        # flags form
 ```
 
-### Best Practices
+### Check current timer
 
-**Clear descriptions:**
 ```bash
-# Good
-homer clockify start "Fixing bug #NDI-123: User login timeout"
-
-# Less helpful
-homer clockify start "Work"
+homer ck current
 ```
 
-**Use consistent projects:**
+Shows description, elapsed time, project, and tags.
+
+### Stop timers
+
 ```bash
-# Same project name every time
-homer clockify start "Task 1" --project "web-api"
-homer clockify start "Task 2" --project "web-api"
-# Later reports group by project automatically
+homer ck stop
 ```
 
-**Tag by context:**
-```bash
-# Tag by type of work
-homer clockify start "Debugging" --tags "debugging"
-
-# Tag by area
-homer clockify start "API work" --tags "backend"
-
-# Tag by urgency
-homer clockify start "Critical bug" --tags "urgent,production"
-
-# Multiple tags
-homer clockify start "Fix prod bug" --tags "production,urgent,debugging"
-```
+Stops all running timers and shows the final duration.
 
 ---
 
 ## Clockify Reports
 
-### Summary Reports
+Dates use `YYYY-MM-DD` format.
 
-View a high-level breakdown by project/date/tag:
+### Summary report
 
-Basic - grouped by project (default):
 ```bash
-homer clockify summary 2024-01-01 2024-01-31
+homer ck summary 2026-01-01 2026-01-31
 ```
 
-Grouped by date:
+Groups by project by default. Change grouping:
+
 ```bash
-homer clockify summary 2024-01-01 2024-01-31 --group-by DATE
+homer ck summary 2026-01-01 2026-01-31 -g DATE     # by date
+homer ck summary 2026-01-01 2026-01-31 -g TAG      # by tag
+homer ck summary 2026-01-01 2026-01-31 -g PROJECT  # by project (default)
 ```
 
-Grouped by tag:
+Filter by project or tag:
+
 ```bash
-homer clockify summary 2024-01-01 2024-01-31 --group-by TAG
+homer ck summary 2026-01-01 2026-01-31 -p "web-api"
+homer ck summary 2026-01-01 2026-01-31 -t "feature"
+homer ck summary 2026-01-01 2026-01-31 -p "web-api" -t "feature"
 ```
 
-Multiple groupings (note: currently supports one primary grouping):
+### Detailed report
+
 ```bash
-# Group by multiple dimensions
-homer clockify summary 2024-01-01 2024-01-31 --group-by "DATE,PROJECT"
+homer ck detailed 2026-01-01 2026-01-31
+homer ck detailed 2026-01-01 2026-01-31 -p "web-api"
 ```
 
-### Filtering Reports
-
-Filter by project:
-```bash
-homer clockify summary 2024-01-01 2024-01-31 --project "web-api"
-```
-
-Filter by tag:
-```bash
-homer clockify summary 2024-01-01 2024-01-31 --tags "production"
-```
-
-Both project and tag:
-```bash
-homer clockify summary 2024-01-01 2024-01-31 \
-  --project "web-api" \
-  --tags "urgent"
-```
-
-### Detailed Reports
-
-See every time entry:
-```bash
-homer clockify detailed 2024-01-01 2024-01-31
-```
-
-Output includes:
-- Date
-- Description
-- Duration
-- Start/end times
-- Project
-
-With filters:
-```bash
-homer clockify detailed 2024-01-01 2024-01-31 --project "mobile-app"
-```
-
-### Reading the Output
-
-**Summary Report:**
-```
-Summary Report 2024-01-01 to 2024-01-31
-┏━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
-┃ Name        ┃ Duration┃ Billable ┃
-┡━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
-│ 2024-01-01  │ 8:15:00 │ 8:15:00  │
-│ 2024-01-02  │ 7:45:00 │ 7:45:00  │
-└─────────────┴─────────┴──────────┘
-
-Total: 16:00:00 Billable: 16:00:00
-```
-
-**Detailed Report:**
-```
-Detailed Report 2024-01-01 to 2024-01-31
-┏━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━┳━━━━━━┓
-┃ Date     ┃ Desc   ┃ Project┃ Dur.. ┃Start ┃End   ┃
-├──────────┼────────┼────────┼───────┼──────┼──────┤
-│ 2024-01-01│Debugging│web-api │01:30:00│09:00│10:30│
-│ 2024-01-01│Feature X│web-api │04:00:00│14:00│18:00│
-└──────────┴────────┴────────┴───────┴──────┴──────┘
-
-Total Duration: 5:30:00
-```
-
-### Report Tips
-
-**Weekly reports:**
-```bash
-# Monday to Friday of this week
-homer clockify summary 2024-01-29 2024-02-02
-```
-
-**Monthly reports:**
-```bash
-# Entire January
-homer clockify summary 2024-01-01 2024-01-31
-```
-
-**Find time by project:**
-```bash
-# How much time on web-api?
-homer clockify summary 2024-01-01 2024-01-31 --project "web-api"
-```
-
-**Billable vs non-billable:**
-The report shows both. Use tags to mark billable work.
+Shows every time entry with date, description, project, start/end, and duration.
 
 ---
 
 ## Jira Issues
 
-### Listing Issues
+### List your open issues
 
-See all your open issues (assigned to you, not Done):
 ```bash
 homer jira list
 ```
 
-Output:
-```
-Your Open Issues
-┏━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
-┃ Key     ┃ Summary ┃ Status ┃ Pri... ┃ Assig..┃
-├─────────┼─────────┼────────┼────────┼────────┤
-│ NDI-123 │ Fix...  │ Open   │ High   │ You    │
-│ NDI-456 │ Feature │ In Pro │Medium  │ Alice  │
-└─────────┴─────────┴────────┴────────┴────────┘
+Shows all issues assigned to you that are not Done.
 
-Total: 5 open issues
-```
+### View issue details
 
-### Viewing Issues
-
-Get full details of an issue:
 ```bash
 homer jira view NDI-123
 ```
 
-Output:
-```
-NDI-123 Fix login bug
-────────────────────────────────────────────
+Shows key, summary, status, priority, assignee, and description.
 
-Status:     In Progress
-Priority:   High
-Assignee:   John Doe
-Project:    NDI
+### Create an issue
 
-Description:
-Users cannot log in with LDAP credentials.
-Getting "Invalid token" error.
-Stack trace shows issue in auth middleware.
-```
-
-### Creating Issues
-
-Simple - just a summary:
+Minimal:
 ```bash
 homer jira create "Fix login bug"
 ```
 
-With type and priority:
+With options:
 ```bash
-homer jira create "Implement password reset" \
-  --type Story \
-  --priority Medium
-```
-
-Full options:
-```bash
-homer jira create "Production bug: User data corruption" \
+homer jira create "Implement 2FA" \
   --project NDI \
-  --type Bug \
-  --priority Highest \
-  --description "Users reporting missing data in their profiles.
-                 Looks like a database migration issue.
-                 Started after 2024-01-30 deployment."
+  --type Story \
+  --priority High \
+  --description "Add TOTP-based two-factor authentication."
 ```
 
-Output when created:
-```
-✓ Issue created: NDI-789
-  Implement password reset
-```
+| Option | Short | Default |
+|---|---|---|
+| `--project` | `-p` | `DEFAULT_PROJECT` from `~/.env` |
+| `--type` | `-t` | `Story` |
+| `--priority` | | `Medium` |
+| `--description` | `-d` | _(none)_ |
 
-### Adding Comments
+### Comment on an issue
 
-Simple comment:
 ```bash
-homer jira comment NDI-123 "This is ready for QA"
+homer jira comment NDI-123 "Ready for QA review"
 ```
 
-Multi-line comment:
-```bash
-homer jira comment NDI-123 "Done with implementation.
-  - All tests passing
-  - Code reviewed
-  - Ready for QA"
-```
+### Mention a teammate
 
-### Mentioning Users
-
-Mention someone in a comment:
 ```bash
 homer jira mention NDI-123 "alice" "Can you review this?"
 ```
 
-Homer automatically finds the user and adds the mention.
-
-Multiple mentions in one message:
-```bash
-# Mention first user, then another in the comment text
-homer jira mention NDI-123 "alice" "alice please review, then QA"
-```
-
-### Workflow Example
-
-**Typical issue lifecycle:**
-
-1. Create issue:
-```bash
-homer jira create "Implement 2FA"
-# Returns: NDI-999
-```
-
-2. View the issue:
-```bash
-homer jira view NDI-999
-```
-
-3. Start working (use Clockify):
-```bash
-homer clockify start "Implementing 2FA" --project "web-api" --tags "feature"
-```
-
-4. Add progress comments:
-```bash
-homer jira comment NDI-999 "Backend authentication complete, moving to frontend"
-```
-
-5. When done:
-```bash
-homer clockify stop
-homer jira comment NDI-999 "Ready for code review"
-homer jira mention NDI-999 "bob" "Please review implementation"
-```
+Homer finds the user by name/email and adds a proper Jira mention.
 
 ---
 
-## Advanced Tips
+## Typical Workflows
 
-### Shell Aliases
-
-Add to your shell config (`~/.bashrc`, `~/.zshrc`, or `~/.fish/config.fish`):
+### Track time on a Jira issue
 
 ```bash
-# Clockify shortcuts
-alias hstart='homer clockify start'
-alias hstop='homer clockify stop'
-alias hnow='homer clockify current'
-alias hreport='homer clockify summary'
+homer jira list                                   # see what's assigned
+homer jira view NDI-456                           # read the issue
 
-# Jira shortcuts
-alias hjira='homer jira list'
-alias hjview='homer jira view'
-alias hjcreate='homer jira create'
-alias hjcomment='homer jira comment'
-alias hjmention='homer jira mention'
+homer ck start "NDI-456 · Implementing feature" -p "" -T
+# → opens project selector (pick or create) and tag selector
+
+# ... work ...
+
+homer ck current                                  # check elapsed time
+homer ck stop                                     # done
+
+homer jira comment NDI-456 "Implementation complete, ready for review"
+homer jira mention NDI-456 "alice" "Please review when you can"
 ```
 
-Then use:
-```bash
-hstart "Task description"
-hnow
-hstop
-hjira
-hjview NDI-123
-```
-
-### Scripting
-
-Use Homer in shell scripts:
+### Daily routine
 
 ```bash
-#!/bin/bash
-
-# Start timer
-ISSUE="NDI-$(date +%d)"
-DESCRIPTION="Daily task $ISSUE"
-
-homer clockify start "$DESCRIPTION" --project "daily-work"
-
-# Do work...
-sleep 3600  # Simulate 1 hour of work
-
-# Stop and report
-homer clockify stop
-
-# Create summary
-echo "Work summary for $(date +%Y-%m-%d)"
-homer jira view "$ISSUE"
-```
-
-### Integration with Git Commits
-
-Start timer before committing, stop after:
-
-```bash
-#!/bin/bash
-
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-ISSUE=$(echo $BRANCH | grep -oE '[A-Z]+-[0-9]+')
-
-if [ ! -z "$ISSUE" ]; then
-  homer clockify start "Working on $ISSUE" --tags "dev"
-  # ... make commits ...
-  homer clockify stop
-fi
-```
-
-### Combining Multiple Operations
-
-Complex workflow in one command:
-
-```bash
-# Create issue, then immediately comment
-ISSUE=$(homer jira create "Bug report" --priority High | grep -oE '[A-Z]+-[0-9]+')
-homer jira comment "$ISSUE" "Auto-created bug report"
-```
-
-### Getting Data for External Tools
-
-Export time data:
-```bash
-# Get summary as structured text
-homer clockify summary 2024-01-01 2024-01-31 > weekly_report.txt
-
-# Get detailed data
-homer clockify detailed 2024-01-01 2024-01-31 > timesheet.txt
-```
-
-### Check Multiple Issues
-
-Loop through issues:
-
-```bash
-for issue in NDI-123 NDI-456 NDI-789; do
-  echo "=== $issue ==="
-  homer jira view $issue
-done
-```
-
----
-
-## Troubleshooting Usage
-
-### "No timer running" when I started one
-
-The timer may have auto-stopped or there was an error. Check:
-```bash
-homer clockify current   # Verify if running
-homer jira list          # Verify connection works
-```
-
-### "Issue not found" error
-
-Verify the issue key:
-```bash
-homer jira list  # See all your issues
-```
-
-Issue key format is `PROJECT-NUMBER` (e.g., `NDI-123`, not just `123`).
-
-### Dates in wrong format
-
-Always use `YYYY-MM-DD` format for dates:
-
-```bash
-# Correct
-homer clockify summary 2024-01-15 2024-01-31
-
-# Incorrect (will fail)
-homer clockify summary 01/15/2024 01/31/2024
-```
-
-### User not found when mentioning
-
-Make sure to use first name or email substring:
-```bash
-# These might work
-homer jira mention NDI-123 "alice" "..."
-homer jira mention NDI-123 "alice@company" "..."
-
-# This might not
-homer jira mention NDI-123 "a" "..."  # Too ambiguous
-```
-
----
-
-## Getting Help
-
-```bash
-# See all commands
-homer --help
-
-# Help for Clockify commands
-homer clockify --help
-
-# Help for specific command
-homer clockify start --help
-homer jira create --help
-
-# Update configuration if credentials change
-homer init
-
-# Check if you're properly configured
-homer clockify current
+# Morning: check workload
 homer jira list
+
+# Start work
+homer ck start "Working on NDI-789" -p "NDI-789" -t "feature"
+
+# Break: switch tasks
+homer ck stop
+homer ck start "Team standup" -t "meetings"
+homer ck stop
+
+# Resume
+homer ck start "Working on NDI-789" -p "NDI-789" -t "feature"
+homer ck stop
+
+# End of day: summary
+homer ck summary 2026-08-02 2026-08-02
+```
+
+### Weekly report
+
+```bash
+homer ck summary 2026-07-28 2026-08-01
+homer ck detailed 2026-07-28 2026-08-01
+```
+
+### Create issue and track immediately
+
+```bash
+homer jira create "Critical bug: users can't log in" --type Bug --priority Highest
+# returns NDI-999
+
+homer ck start "Debugging NDI-999" -p "NDI-999"
+# service fetches Jira summary → creates project "[NDI-999] Critical bug: users can't log in"
+
+homer ck stop
+homer jira comment NDI-999 "Root cause identified — LDAP timeout in auth middleware. Fix deployed."
 ```
 
 ---
 
-**Happy productivity! 🚀**
+## Shell Aliases
+
+Add to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+alias hstart='homer ck start'
+alias hstop='homer ck stop'
+alias hnow='homer ck current'
+alias hjira='homer jira list'
+```
+
+Reload: `source ~/.bashrc`
+

@@ -166,19 +166,15 @@ class TestReportSummary:
         from homer.clockify.models import ReportSummary
 
         data = {
-            "groupEntries": [
-                {
-                    "name": "Web API",
-                    "duration": 3600000,
-                    "billableDuration": 3600000,
-                    "children": [],
-                }
-            ]
+            "groupOne": [
+                {"name": "Web API", "duration": 3600, "_id": "p-1"},
+            ],
+            "totals": [{"totalTime": 3600, "totalBillableTime": 3600, "entriesCount": 1}],
         }
         report = ReportSummary(**data)
 
-        assert len(report.groupEntries) == 1
-        assert report.groupEntries[0].name == "Web API"
+        assert len(report.groupOne) == 1
+        assert report.groupOne[0]["name"] == "Web API"
 
 
 class TestDetailedEntry:
