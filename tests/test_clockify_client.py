@@ -276,14 +276,10 @@ class TestSummaryReport:
 
     def test_returns_summary_report(self, client: ClockifyClient) -> None:
         mock_response = {
-            "groupEntries": [
-                {
-                    "name": "Web API",
-                    "duration": 3600000,
-                    "billableDuration": 3600000,
-                    "children": [],
-                }
-            ]
+            "groupOne": [
+                {"name": "Web API", "duration": 3600, "_id": "p-1"},
+            ],
+            "totals": [{"totalTime": 3600, "totalBillableTime": 3600, "entriesCount": 1}],
         }
 
         with patch("httpx.post") as mock_post:
@@ -295,11 +291,11 @@ class TestSummaryReport:
                 date_to="2026-08-31",
             )
 
-        assert len(result.groupEntries) == 1
-        assert result.groupEntries[0].name == "Web API"
+        assert len(result.groupOne) == 1
+        assert result.groupOne[0]["name"] == "Web API"
 
     def test_passes_filters_to_api(self, client: ClockifyClient) -> None:
-        mock_response = {"groupEntries": []}
+        mock_response = {"groupOne": [], "totals": []}
 
         with patch("httpx.post") as mock_post:
             mock_post.return_value.json.return_value = mock_response

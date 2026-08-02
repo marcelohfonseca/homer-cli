@@ -64,16 +64,15 @@ class GroupEntry(BaseModel):
 class ReportSummary(BaseModel):
     """Summary report response from Clockify.
 
-    The API response shape varies by grouping — we accept any extra fields
-    and only guarantee 'totals' exists (defaulting to empty list).
+    The API returns entries in 'groupOne' (and optionally 'groupTwo', etc.)
+    with duration in seconds. 'totals' is a list of aggregate dicts.
+    We use extra='allow' to absorb any additional fields.
     """
 
     model_config = {"extra": "allow"}
 
-    groupEntries: list[GroupEntry] = Field(default_factory=list, description="Top-level grouped entries")
-    totals: list[dict[str, Any]] = Field(
-        default_factory=list, description="Totals with totalTime and entriesCount"
-    )
+    groupOne: list[dict[str, Any]] = Field(default_factory=list, description="First grouping level entries")
+    totals: list[dict[str, Any]] = Field(default_factory=list, description="Aggregate totals")
 
 
 class DetailedTimeInterval(BaseModel):

@@ -395,7 +395,10 @@ def summary(
             group_by=group_by_list,
         )
 
-        if not report.groupEntries and not report.totals:
+        entries = report.groupOne
+        total_row = report.totals[0] if report.totals else {}
+
+        if not entries and not total_row.get("totalTime"):
             console.print("[yellow]ℹ[/yellow]  No time entries found for the specified period.")
             return
 
@@ -410,31 +413,19 @@ def summary(
         table.add_column("Duration", style="green", justify="right")
         table.add_column("Billable", style="blue", justify="right")
 
-        if report.groupEntries:
-            def add_entry(entry, indent: int = 0) -> None:
-                prefix = "  " * indent
-                name = f"{prefix}{entry.name}" if indent else entry.name
-                duration = _format_duration((entry.duration or 0) // 1000)
-                billable = _format_duration((entry.billableDuration or 0) // 1000)
-                name_style = "white" if indent else "bold white"
-                table.add_row(f"[{name_style}]{name}[/{name_style}]", duration, billable)
-                for child in (entry.children or []):
-                    add_entry(child, indent + 1)
+        for entry in entries:
+            name = entry.get("name") or "[dim](no project)[/dim]"
+            # API returns duration in seconds
+            duration_sec = entry.get("duration", 0) or 0
+            table.add_row(
+                f"[bold white]{name}[/bold white]",
+                _format_duration(duration_sec),
+                "—",
+            )
 
-            for entry in report.groupEntries:
-                add_entry(entry)
-
-            total_sec = sum((e.duration or 0) for e in report.groupEntries) // 1000
-            billable_sec = sum((e.billableDuration or 0) for e in report.groupEntries) // 1000
-        else:
-            # Fallback: render from totals list when groupEntries is absent
-            for row in report.totals:
-                name = str(row.get("_id", "—"))
-                total_ms = row.get("totalTime", 0) or 0
-                billable_ms = row.get("totalBillableTime", 0) or 0
-                table.add_row(name, _format_duration(total_ms // 1000), _format_duration(billable_ms // 1000))
-            total_sec = sum((r.get("totalTime", 0) or 0) for r in report.totals) // 1000
-            billable_sec = sum((r.get("totalBillableTime", 0) or 0) for r in report.totals) // 1000
+        total_sec = total_row.get("totalTime", 0) or 0
+        billable_sec = total_row.get("totalBillableTime", 0) or 0
+        entries_count = total_row.get("entriesCount", 0) or 0
 
         table.add_section()
         table.add_row(

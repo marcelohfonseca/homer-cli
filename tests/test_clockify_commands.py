@@ -270,17 +270,11 @@ class TestSummaryCommand:
     """homer clockify summary command."""
 
     def test_displays_summary_report(self, runner: CliRunner) -> None:
-        from homer.clockify.models import GroupEntry, ReportSummary
+        from homer.clockify.models import ReportSummary
 
         mock_report = ReportSummary(
-            groupEntries=[
-                GroupEntry(
-                    name="Web API",
-                    duration=3600000,
-                    billableDuration=3600000,
-                    children=[],
-                )
-            ]
+            groupOne=[{"name": "Web API", "duration": 3600, "_id": "p-1"}],
+            totals=[{"totalTime": 3600, "totalBillableTime": 3600, "entriesCount": 1}],
         )
 
         with patch("homer.clockify.commands.get_settings"):
@@ -315,9 +309,9 @@ class TestSummaryCommand:
         assert "Invalid date format" in result.output
 
     def test_passes_filters_to_service(self, runner: CliRunner) -> None:
-        from homer.clockify.models import GroupEntry, ReportSummary
+        from homer.clockify.models import ReportSummary
 
-        mock_report = ReportSummary(groupEntries=[])
+        mock_report = ReportSummary(groupOne=[], totals=[])
 
         with patch("homer.clockify.commands.get_settings"):
             with patch(
@@ -348,7 +342,7 @@ class TestSummaryCommand:
     def test_shows_message_when_no_entries(self, runner: CliRunner) -> None:
         from homer.clockify.models import ReportSummary
 
-        mock_report = ReportSummary(groupEntries=[])
+        mock_report = ReportSummary(groupOne=[], totals=[])
 
         with patch("homer.clockify.commands.get_settings"):
             with patch(
