@@ -39,6 +39,8 @@ class TimeInterval(BaseModel):
 class TimeEntry(BaseModel):
     """A Clockify time entry."""
 
+    model_config = {"extra": "allow"}
+
     id: str = Field(description="Unique entry ID")
     timeInterval: TimeInterval = Field(description="Time interval")
     description: str | None = Field(default=None, description="Entry description")
