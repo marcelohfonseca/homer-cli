@@ -1,3 +1,9 @@
+## 0.2.2 (2026-08-02)
+
+### Fix
+
+- resolve project ID to name in stop/current output; hide clockify alias
+
 ## 0.2.1 (2026-08-02)
 
 ### Refactor
