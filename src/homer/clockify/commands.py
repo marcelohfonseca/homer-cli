@@ -177,6 +177,61 @@ def _prompt_project(service: ClockifyService) -> str | None:
     return raw
 
 
+def _prompt_tags(service: ClockifyService) -> list[str] | None:
+    """Interactively prompt the user to select one or more tags.
+
+    Displays a numbered list of existing Clockify tags. The user may enter
+    comma-separated numbers, type free-form tag names, or leave blank to skip.
+
+    Args:
+        service: Initialized ClockifyService used to fetch tags.
+
+    Returns:
+        List of tag name strings, or None if the user skips.
+    """
+    try:
+        tag_names = service.list_tags()
+    except ClockifyError:
+        tag_names = []
+
+    if not tag_names:
+        value = typer.prompt(
+            "Tags (comma-separated, blank to skip)",
+            default="",
+            show_default=False,
+        ).strip()
+        return [t.strip() for t in value.split(",") if t.strip()] or None
+
+    console.print()
+    console.print("  [bold]Select tags[/bold] [dim](comma-separated numbers, type new names, or Enter to skip)[/dim]")
+    console.print()
+    console.print("  [dim]Clockify tags[/dim]")
+    for i, name in enumerate(tag_names, start=1):
+        console.print(f"  [cyan]{i:>2}[/cyan]  {name}")
+    console.print()
+
+    raw = typer.prompt("> ", default="", show_default=False, prompt_suffix="").strip()
+    if not raw:
+        return None
+
+    results: list[str] = []
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if token.isdigit():
+            idx = int(token) - 1
+            if 0 <= idx < len(tag_names):
+                results.append(tag_names[idx])
+            else:
+                console.print(f"[yellow]⚠[/yellow]  Invalid selection '{token}', using as tag name.")
+                results.append(token)
+        else:
+            results.append(token)
+
+    return results or None
+
+
 @app.command()
 def start(
     description: str = typer.Argument(
@@ -187,40 +242,50 @@ def start(
         help="Project name. Omit to start without project; pass empty string or '-p \"\"' to open selector.",
     ),
     tags: str | None = typer.Option(
-        None, "--tags", "-t", help="Comma-separated list of tags"
+        None, "--tags", "-t",
+        help="Comma-separated tag names. Pass empty string or '-t \"\"' to open interactive tag selector.",
     ),
     select: bool = typer.Option(
         False, "--select", "-s",
         help="Open interactive project selector even when not passing -p.",
     ),
+    select_tags: bool = typer.Option(
+        False, "--select-tags", "-T",
+        help="Open interactive tag selector even when not passing -t.",
+    ),
 ) -> None:
     """Start a new timer.
 
-    By default starts immediately without prompting for a project.
-    Use -p to set a project directly, or -s (or -p with empty value) to open
-    the interactive selector.
+    By default starts immediately without prompting for a project or tags.
+    Use -p / -s to set or select a project; use -t / -T to set or select tags.
 
     Examples:
         homer ck start "Fixing login bug"
         homer ck start "Code review" -p "Web API"
         homer ck start "Code review" -s
+        homer ck start "Code review" -T
+        homer ck start "Code review" -p "" -t ""
     """
     try:
         service = _get_service()
 
-        # Decide whether to open the interactive selector:
-        # - explicit -s flag
-        # - -p passed with empty string (user hit Enter without typing)
+        # Project resolution
         open_selector = select or (project is not None and project.strip() == "")
 
         if open_selector:
             resolved_project = _prompt_project(service)
         else:
-            # Use exactly what was typed, or None if -p was omitted entirely
             resolved_project = project.strip() if project else None
 
-        # Parse tags from comma-separated string
-        tag_list = [tag.strip() for tag in tags.split(",")] if tags else None
+        # Tag resolution
+        open_tag_selector = select_tags or (tags is not None and tags.strip() == "")
+
+        if open_tag_selector:
+            tag_list = _prompt_tags(service)
+        elif tags:
+            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+        else:
+            tag_list = None
 
         entry = service.start_timer(
             description=description,

@@ -145,6 +145,18 @@ class ClockifyService:
         projects = self.client.get_projects()
         return sorted(p.name for p in projects)
 
+    def list_tags(self) -> list[str]:
+        """Return names of all existing Clockify tags.
+
+        Returns:
+            Sorted list of tag names.
+
+        Raises:
+            ClockifyError: On API failure.
+        """
+        tags = self.client.get_tags()
+        return sorted(t.name for t in tags)
+
     def _resolve_or_create_project(self, name: str) -> str | None:
         """Resolve a project name to ID, creating it if necessary.
 
