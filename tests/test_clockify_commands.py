@@ -123,7 +123,7 @@ class TestStartCommand:
 
                 # Simulate user typing "1" then Enter to pick first project
                 with patch("homer.clockify.commands._prompt_project", return_value="web-api"):
-                    result = runner.invoke(app, ["start", "Work"])
+                    result = runner.invoke(app, ["start", "Work", "--select"])
 
         assert result.exit_code == 0
         call_args = mock_service.start_timer.call_args
@@ -132,7 +132,7 @@ class TestStartCommand:
     def test_interactive_prompt_accepts_free_text(
         self, runner: CliRunner
     ) -> None:
-        """When --project is omitted, typing text uses it as project name."""
+        """When --select is used, typing text uses it as project name."""
         mock_entry = TimeEntry(
             id="e-1",
             timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
@@ -149,7 +149,7 @@ class TestStartCommand:
                 mock_service_factory.return_value = mock_service
 
                 with patch("homer.clockify.commands._prompt_project", return_value="new-project"):
-                    result = runner.invoke(app, ["start", "Work"])
+                    result = runner.invoke(app, ["start", "Work", "--select"])
 
         assert result.exit_code == 0
         call_args = mock_service.start_timer.call_args
@@ -158,7 +158,7 @@ class TestStartCommand:
     def test_interactive_prompt_skips_project_on_blank(
         self, runner: CliRunner
     ) -> None:
-        """When --project is omitted and user presses Enter, project is None."""
+        """When --select is used and user presses Enter, project is None."""
         mock_entry = TimeEntry(
             id="e-1",
             timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
@@ -174,7 +174,7 @@ class TestStartCommand:
                 mock_service_factory.return_value = mock_service
 
                 with patch("homer.clockify.commands._prompt_project", return_value=None):
-                    result = runner.invoke(app, ["start", "Work"])
+                    result = runner.invoke(app, ["start", "Work", "--select"])
 
         assert result.exit_code == 0
         call_args = mock_service.start_timer.call_args
@@ -370,27 +370,22 @@ class TestDetailedCommand:
     """homer clockify detailed command."""
 
     def test_displays_detailed_report(self, runner: CliRunner) -> None:
-        from homer.clockify.models import (
-            DetailedEntry,
-            DetailedTimeInterval,
-            ReportDetailed,
-        )
+        from homer.clockify.models import DetailedEntry, ReportDetailed
 
         mock_report = ReportDetailed(
-            totals=DetailedTimeInterval(
-                timeentries=[
-                    DetailedEntry(
-                        id="e-1",
-                        timeInterval=TimeInterval(
-                            start="2026-07-31T08:00:00Z",
-                            end="2026-07-31T09:00:00Z",
-                        ),
-                        description="Code review",
-                        projectId="p-1",
-                        duration=3600000,
-                    )
-                ]
-            )
+            timeentries=[
+                DetailedEntry(
+                    id="e-1",
+                    timeInterval=TimeInterval(
+                        start="2026-07-31T08:00:00Z",
+                        end="2026-07-31T09:00:00Z",
+                    ),
+                    description="Code review",
+                    projectId="p-1",
+                    duration=3600000,
+                )
+            ],
+            totals=[],
         )
 
         with patch("homer.clockify.commands.get_settings"):
@@ -425,11 +420,9 @@ class TestDetailedCommand:
         assert "Invalid date format" in result.output
 
     def test_passes_filters_to_service(self, runner: CliRunner) -> None:
-        from homer.clockify.models import DetailedTimeInterval, ReportDetailed
+        from homer.clockify.models import ReportDetailed
 
-        mock_report = ReportDetailed(
-            totals=DetailedTimeInterval(timeentries=[])
-        )
+        mock_report = ReportDetailed(timeentries=[], totals=[])
 
         with patch("homer.clockify.commands.get_settings"):
             with patch(
@@ -456,11 +449,9 @@ class TestDetailedCommand:
         assert call_args.kwargs["tag_name"] == "urgent"
 
     def test_shows_message_when_no_entries(self, runner: CliRunner) -> None:
-        from homer.clockify.models import DetailedTimeInterval, ReportDetailed
+        from homer.clockify.models import ReportDetailed
 
-        mock_report = ReportDetailed(
-            totals=DetailedTimeInterval(timeentries=[])
-        )
+        mock_report = ReportDetailed(timeentries=[], totals=[])
 
         with patch("homer.clockify.commands.get_settings"):
             with patch(

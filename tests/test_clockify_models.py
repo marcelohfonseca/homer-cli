@@ -208,26 +208,25 @@ class TestReportDetailed:
     """ReportDetailed model for detailed report responses."""
 
     def test_creates_from_dict(self) -> None:
-        from homer.clockify.models import ReportDetailed, DetailedTimeInterval
+        from homer.clockify.models import ReportDetailed
 
         data = {
-            "totals": {
-                "timeentries": [
-                    {
-                        "id": "entry-123",
-                        "timeInterval": {
-                            "start": "2026-07-31T08:00:00Z",
-                            "end": "2026-07-31T09:00:00Z",
-                        },
-                        "description": "Code review",
-                        "projectId": "proj-123",
-                        "duration": 3600000,
-                    }
-                ]
-            }
+            "timeentries": [
+                {
+                    "id": "entry-123",
+                    "timeInterval": {
+                        "start": "2026-07-31T08:00:00Z",
+                        "end": "2026-07-31T09:00:00Z",
+                    },
+                    "description": "Code review",
+                    "projectId": "proj-123",
+                    "duration": 3600000,
+                }
+            ],
+            "totals": [],
         }
         report = ReportDetailed(**data)
 
-        assert len(report.totals.timeentries) == 1
-        assert report.totals.timeentries[0].description == "Code review"
+        assert len(report.timeentries) == 1
+        assert report.timeentries[0].description == "Code review"
 

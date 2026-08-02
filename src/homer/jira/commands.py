@@ -24,22 +24,41 @@ app = typer.Typer(
 )
 console = Console()
 
-# Priority → colour mapping
+# Priority → colour mapping (English and Portuguese)
 _PRIORITY_STYLE: dict[str, str] = {
     "Highest": "bold red",
     "High": "red",
     "Medium": "yellow",
     "Low": "cyan",
     "Lowest": "dim cyan",
+    # Portuguese
+    "Bloqueador": "bold red",
+    "Crítico": "bold red",
+    "Alto": "red",
+    "Médio": "yellow",
+    "Baixo": "cyan",
+    "Trivial": "dim cyan",
 }
 
-# Status → colour mapping
+# Status → colour mapping (English and Portuguese)
 _STATUS_STYLE: dict[str, str] = {
     "To Do": "dim",
     "In Progress": "bold yellow",
     "In Review": "bold cyan",
     "Done": "green",
     "Blocked": "bold red",
+    # Portuguese
+    "Backlog": "dim",
+    "A Fazer": "dim",
+    "Em Desenvolvimento": "bold yellow",
+    "EM ANDAMENTO": "bold yellow",
+    "Em Andamento": "bold yellow",
+    "AGUARDANDO": "yellow",
+    "Em Revisão": "bold cyan",
+    "Em Review": "bold cyan",
+    "Concluído": "green",
+    "Feito": "green",
+    "Bloqueado": "bold red",
 }
 
 

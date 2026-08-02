@@ -129,8 +129,8 @@ def _prompt_project(service: ClockifyService) -> str | None:
         jira_service = JiraService.from_settings(settings)
         issues = jira_service.list_my_issues()
         for issue in issues:
-            label = f"{issue.key} · {issue.summary}"
-            choices.append((label, label))
+            label = f"[{issue.key}] {issue.summary}"
+            choices.append((f"{issue.key} · {issue.summary[:60]}", label))
     except Exception:
         pass  # Jira not configured or unavailable — non-fatal
 
@@ -183,28 +183,41 @@ def start(
         help="Timer description"
     ),
     project: str | None = typer.Option(
-        None, "--project", "-p", help="Project name (omit to select interactively)"
+        None, "--project", "-p",
+        help="Project name. Omit to start without project; pass empty string or '-p \"\"' to open selector.",
     ),
     tags: str | None = typer.Option(
         None, "--tags", "-t", help="Comma-separated list of tags"
     ),
+    select: bool = typer.Option(
+        False, "--select", "-s",
+        help="Open interactive project selector even when not passing -p.",
+    ),
 ) -> None:
     """Start a new timer.
 
-    When --project is omitted, an interactive selector shows your existing
-    Clockify projects and open Jira issues to choose from.
+    By default starts immediately without prompting for a project.
+    Use -p to set a project directly, or -s (or -p with empty value) to open
+    the interactive selector.
 
     Examples:
         homer ck start "Fixing login bug"
-        homer ck start "Code review" --project "web-api" --tags "review,urgent"
+        homer ck start "Code review" -p "Web API"
+        homer ck start "Code review" -s
     """
     try:
         service = _get_service()
 
-        # If no project supplied, offer interactive selection
-        resolved_project = project
-        if resolved_project is None:
+        # Decide whether to open the interactive selector:
+        # - explicit -s flag
+        # - -p passed with empty string (user hit Enter without typing)
+        open_selector = select or (project is not None and project.strip() == "")
+
+        if open_selector:
             resolved_project = _prompt_project(service)
+        else:
+            # Use exactly what was typed, or None if -p was omitted entirely
+            resolved_project = project.strip() if project else None
 
         # Parse tags from comma-separated string
         tag_list = [tag.strip() for tag in tags.split(",")] if tags else None
@@ -215,8 +228,17 @@ def start(
             tag_names=tag_list,
         )
 
+        # Warn if a project was requested but couldn't be resolved/created
+        project_resolved = entry.projectId is not None
+        if resolved_project and not project_resolved:
+            console.print(
+                f"[yellow]⚠[/yellow]  Project [dim]{resolved_project!r}[/dim] not found and could not be created "
+                f"(no permission). Timer started without a project.",
+                highlight=False,
+            )
+
         rows: list[tuple[str, str]] = [("Description", entry.description or "")]
-        if resolved_project:
+        if project_resolved and resolved_project:
             rows.append(("Project", resolved_project))
         if tag_list:
             rows.append(("Tags", "  ".join(f"[cyan]#{t}[/cyan]" for t in tag_list)))
@@ -373,7 +395,7 @@ def summary(
             group_by=group_by_list,
         )
 
-        if not report.groupEntries:
+        if not report.groupEntries and not report.totals:
             console.print("[yellow]ℹ[/yellow]  No time entries found for the specified period.")
             return
 
@@ -388,21 +410,32 @@ def summary(
         table.add_column("Duration", style="green", justify="right")
         table.add_column("Billable", style="blue", justify="right")
 
-        def add_entry(entry, indent: int = 0) -> None:
-            prefix = "  " * indent
-            name = f"{prefix}{entry.name}" if indent else entry.name
-            duration = _format_duration((entry.duration or 0) // 1000)
-            billable = _format_duration((entry.billableDuration or 0) // 1000)
-            name_style = "white" if indent else "bold white"
-            table.add_row(f"[{name_style}]{name}[/{name_style}]", duration, billable)
-            for child in (entry.children or []):
-                add_entry(child, indent + 1)
+        if report.groupEntries:
+            def add_entry(entry, indent: int = 0) -> None:
+                prefix = "  " * indent
+                name = f"{prefix}{entry.name}" if indent else entry.name
+                duration = _format_duration((entry.duration or 0) // 1000)
+                billable = _format_duration((entry.billableDuration or 0) // 1000)
+                name_style = "white" if indent else "bold white"
+                table.add_row(f"[{name_style}]{name}[/{name_style}]", duration, billable)
+                for child in (entry.children or []):
+                    add_entry(child, indent + 1)
 
-        for entry in report.groupEntries:
-            add_entry(entry)
+            for entry in report.groupEntries:
+                add_entry(entry)
 
-        total_sec = sum((e.duration or 0) for e in report.groupEntries) // 1000
-        billable_sec = sum((e.billableDuration or 0) for e in report.groupEntries) // 1000
+            total_sec = sum((e.duration or 0) for e in report.groupEntries) // 1000
+            billable_sec = sum((e.billableDuration or 0) for e in report.groupEntries) // 1000
+        else:
+            # Fallback: render from totals list when groupEntries is absent
+            for row in report.totals:
+                name = str(row.get("_id", "—"))
+                total_ms = row.get("totalTime", 0) or 0
+                billable_ms = row.get("totalBillableTime", 0) or 0
+                table.add_row(name, _format_duration(total_ms // 1000), _format_duration(billable_ms // 1000))
+            total_sec = sum((r.get("totalTime", 0) or 0) for r in report.totals) // 1000
+            billable_sec = sum((r.get("totalBillableTime", 0) or 0) for r in report.totals) // 1000
+
         table.add_section()
         table.add_row(
             "[bold]Total[/bold]",
@@ -447,7 +480,7 @@ def detailed(
             tag_name=tags,
         )
 
-        if not report.totals or not report.totals.timeentries:
+        if not report.timeentries:
             console.print("[yellow]ℹ[/yellow]  No time entries found for the specified period.")
             return
 
@@ -467,11 +500,13 @@ def detailed(
 
         total_duration = 0
 
-        for entry in report.totals.timeentries:
-            date_part = entry.timeInterval.start.split("T")[0] if "T" in entry.timeInterval.start else entry.timeInterval.start
-            start_time = entry.timeInterval.start.split("T")[1][:5] if "T" in entry.timeInterval.start else ""
-            end_time = entry.timeInterval.end.split("T")[1][:5] if entry.timeInterval.end and "T" in entry.timeInterval.end else ""
-            duration = entry.duration or 0
+        for entry in report.timeentries:
+            start_raw = str(entry.timeInterval.start)
+            end_raw = str(entry.timeInterval.end) if entry.timeInterval.end else ""
+            date_part = start_raw.split("T")[0] if "T" in start_raw else start_raw
+            start_time = start_raw.split("T")[1][:5] if "T" in start_raw else ""
+            end_time = end_raw.split("T")[1][:5] if "T" in end_raw else ""
+            duration = entry.duration_ms
             total_duration += duration
             table.add_row(
                 date_part,

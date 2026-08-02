@@ -45,14 +45,12 @@ class TestSearch:
                     "fields": {"summary": "Issue 1"},
                 }
             ],
-            "total": 1,
-            "startAt": 0,
-            "maxResults": 50,
+            "isLast": True,
         }
 
-        with patch("httpx.get") as mock_get:
-            mock_get.return_value.json.return_value = mock_response
-            mock_get.return_value.raise_for_status = MagicMock()
+        with patch("httpx.post") as mock_post:
+            mock_post.return_value.json.return_value = mock_response
+            mock_post.return_value.raise_for_status = MagicMock()
 
             result = client.search("assignee = currentUser()")
 
@@ -60,8 +58,8 @@ class TestSearch:
         assert result.issues[0].key == "NDI-1"
 
     def test_raises_jira_error_on_http_failure(self, client: JiraClient) -> None:
-        with patch("httpx.get") as mock_get:
-            mock_get.side_effect = httpx.HTTPError("Connection failed")
+        with patch("httpx.post") as mock_post:
+            mock_post.side_effect = httpx.HTTPError("Connection failed")
 
             with pytest.raises(JiraError, match="Failed to search issues"):
                 client.search("assignee = currentUser()")

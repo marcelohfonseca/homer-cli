@@ -284,7 +284,7 @@ JIRA_API_TOKEN=your_api_token_here
 
 CLOCKIFY_API_KEY=your_api_key
 CLOCKIFY_WORKSPACE=workspace_id
-CLOCKIFY_USER=user_id
+CLOCKIFY_USER=your_clockify_user_id  # alphanumeric ID, NOT your email — get it from: curl -H "X-Api-Key: YOUR_KEY" https://api.clockify.me/api/v1/user | grep '"id"'
 ```
 
 To update configuration:

@@ -368,27 +368,22 @@ class TestDetailedReport:
     def test_fetches_detailed_report(
         self, service: ClockifyService, mock_client: MagicMock
     ) -> None:
-        from homer.clockify.models import (
-            DetailedEntry,
-            DetailedTimeInterval,
-            ReportDetailed,
-        )
+        from homer.clockify.models import DetailedEntry, ReportDetailed
 
         mock_report = ReportDetailed(
-            totals=DetailedTimeInterval(
-                timeentries=[
-                    DetailedEntry(
-                        id="e-1",
-                        timeInterval=TimeInterval(
-                            start="2026-07-31T08:00:00Z",
-                            end="2026-07-31T09:00:00Z",
-                        ),
-                        description="Work",
-                        projectId="p-1",
-                        duration=3600000,
-                    )
-                ]
-            )
+            timeentries=[
+                DetailedEntry(
+                    id="e-1",
+                    timeInterval=TimeInterval(
+                        start="2026-07-31T08:00:00Z",
+                        end="2026-07-31T09:00:00Z",
+                    ),
+                    description="Work",
+                    projectId="p-1",
+                    duration=3600000,
+                )
+            ],
+            totals=[],
         )
         mock_client.detailed_report.return_value = mock_report
 
@@ -397,20 +392,18 @@ class TestDetailedReport:
             date_to="2026-08-31",
         )
 
-        assert len(result.totals.timeentries) == 1
-        assert result.totals.timeentries[0].description == "Work"
+        assert len(result.timeentries) == 1
+        assert result.timeentries[0].description == "Work"
 
     def test_resolves_project_name_to_id(
         self, service: ClockifyService, mock_client: MagicMock
     ) -> None:
-        from homer.clockify.models import DetailedTimeInterval, ReportDetailed
+        from homer.clockify.models import ReportDetailed
 
         project = Project(id="p-1", name="Web API")
         mock_client.get_projects.return_value = [project]
 
-        mock_report = ReportDetailed(
-            totals=DetailedTimeInterval(timeentries=[])
-        )
+        mock_report = ReportDetailed(timeentries=[], totals=[])
         mock_client.detailed_report.return_value = mock_report
 
         service.detailed_report(
