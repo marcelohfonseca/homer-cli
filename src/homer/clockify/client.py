@@ -100,7 +100,7 @@ class ClockifyClient:
                 project creation, or 400 for invalid name).
         """
         url = f"{self.BASE_URL}/workspaces/{self.workspace_id}/projects"
-        body = {"name": name, "isPublic": False}
+        body = {"name": name, "isPublic": True}
         try:
             response = httpx.post(
                 url, headers=self._headers(), json=body, timeout=10.0
