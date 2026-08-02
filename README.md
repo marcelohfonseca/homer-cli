@@ -75,7 +75,7 @@ homer ck summary 2026-01-01 2026-01-31      # monthly report
 |---|---|
 | `homer ck start DESCRIPTION` | Start a timer |
 | `homer ck start DESCRIPTION -p PROJECT` | Start with project name or Jira key |
-| `homer ck start DESCRIPTION -p ""` or `-s` | Start and open interactive project selector |
+| `homer ck start DESCRIPTION -p ""` or `-P` | Start and open interactive project selector |
 | `homer ck start DESCRIPTION -t "tag1,tag2"` | Start with tags |
 | `homer ck start DESCRIPTION -t ""` or `-T` | Start and open interactive tag selector |
 | `homer ck current` | Show currently running timer |
@@ -85,9 +85,9 @@ homer ck summary 2026-01-01 2026-01-31      # monthly report
 
 | Option | Short | Description |
 |---|---|---|
-| `--project PROJECT` | `-p` | Project name or Jira key. Empty string or `-s` opens selector |
+| `--project PROJECT` | `-p` | Project name or Jira key. Empty string or `-P` opens selector |
 | `--tags TAGS` | `-t` | Comma-separated tags. Empty string or `-T` opens selector |
-| `--select` | `-s` | Open interactive project selector |
+| `--select` | `-P` | Open interactive project selector |
 | `--select-tags` | `-T` | Open interactive tag selector |
 
 ### Clockify — Reports
