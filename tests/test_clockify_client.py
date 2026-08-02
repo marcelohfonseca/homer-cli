@@ -324,20 +324,19 @@ class TestDetailedReport:
 
     def test_returns_detailed_report(self, client: ClockifyClient) -> None:
         mock_response = {
-            "totals": {
-                "timeentries": [
-                    {
-                        "id": "e-123",
-                        "timeInterval": {
-                            "start": "2026-07-31T08:00:00Z",
-                            "end": "2026-07-31T09:00:00Z",
-                        },
-                        "description": "Work",
-                        "projectId": "p1",
-                        "duration": 3600000,
-                    }
-                ]
-            }
+            "timeentries": [
+                {
+                    "id": "e-123",
+                    "timeInterval": {
+                        "start": "2026-07-31T08:00:00Z",
+                        "end": "2026-07-31T09:00:00Z",
+                    },
+                    "description": "Work",
+                    "projectId": "p1",
+                    "duration": 3600000,
+                }
+            ],
+            "totals": [],
         }
 
         with patch("httpx.post") as mock_post:
@@ -349,11 +348,11 @@ class TestDetailedReport:
                 date_to="2026-08-31",
             )
 
-        assert len(result.totals.timeentries) == 1
-        assert result.totals.timeentries[0].description == "Work"
+        assert len(result.timeentries) == 1
+        assert result.timeentries[0].description == "Work"
 
     def test_passes_filters_to_api(self, client: ClockifyClient) -> None:
-        mock_response = {"totals": {"timeentries": []}}
+        mock_response = {"timeentries": [], "totals": []}
 
         with patch("httpx.post") as mock_post:
             mock_post.return_value.json.return_value = mock_response

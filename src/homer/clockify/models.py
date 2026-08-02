@@ -31,8 +31,8 @@ class TimeInterval(BaseModel):
     end: str | datetime | None = Field(
         default=None, description="End time (ISO 8601 string or datetime, null if running)"
     )
-    duration: int | None = Field(
-        default=None, description="Duration in seconds (computed from start/end)"
+    duration: str | int | None = Field(
+        default=None, description="Duration (ISO 8601 string like PT1H or seconds as int)"
     )
 
 
@@ -60,10 +60,16 @@ class GroupEntry(BaseModel):
 
 
 class ReportSummary(BaseModel):
-    """Summary report response from Clockify."""
+    """Summary report response from Clockify.
 
-    groupEntries: list[GroupEntry] = Field(description="Top-level grouped entries")
-    totals: list[dict[str, int]] = Field(
+    The API response shape varies by grouping — we accept any extra fields
+    and only guarantee 'totals' exists (defaulting to empty list).
+    """
+
+    model_config = {"extra": "allow"}
+
+    groupEntries: list[GroupEntry] = Field(default_factory=list, description="Top-level grouped entries")
+    totals: list[dict[str, Any]] = Field(
         default_factory=list, description="Totals with totalTime and entriesCount"
     )
 
@@ -71,11 +77,13 @@ class ReportSummary(BaseModel):
 class DetailedTimeInterval(BaseModel):
     """Container for detailed time entries in a report."""
 
-    timeentries: list[DetailedEntry] = Field(description="List of time entries")
+    timeentries: list[DetailedEntry] = Field(default_factory=list, description="List of time entries")
 
 
 class DetailedEntry(BaseModel):
     """A single entry in a detailed report."""
+
+    model_config = {"extra": "allow"}
 
     id: str = Field(description="Entry ID")
     timeInterval: TimeInterval = Field(description="Time interval")
@@ -85,11 +93,29 @@ class DetailedEntry(BaseModel):
     billable: bool = Field(default=True, description="Whether billable")
     duration: int | None = Field(default=None, description="Duration in milliseconds")
 
+    @property
+    def duration_ms(self) -> int:
+        """Return duration in milliseconds from any source."""
+        if self.duration is not None:
+            return self.duration
+        # Try to derive from timeInterval.duration (could be seconds as int)
+        d = self.timeInterval.duration
+        if isinstance(d, int):
+            return d * 1000
+        return 0
+
 
 class ReportDetailed(BaseModel):
-    """Detailed report response from Clockify."""
+    """Detailed report response from Clockify.
 
-    totals: DetailedTimeInterval = Field(description="Totals container with time entries")
+    The API returns 'timeentries' at the top level and 'totals' as a list
+    of summary dicts — not a DetailedTimeInterval object.
+    """
+
+    model_config = {"extra": "allow"}
+
+    timeentries: list[DetailedEntry] = Field(default_factory=list, description="Individual time entries")
+    totals: list[dict[str, Any]] = Field(default_factory=list, description="Totals from the report API")
 
 
 
