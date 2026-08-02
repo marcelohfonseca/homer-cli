@@ -1,3 +1,9 @@
+## 0.1.9 (2026-08-02)
+
+### Fix
+
+- summary report now reads groupOne/totals from real API response
+
 ## 0.1.8 (2026-08-02)
 
 ### Fix
