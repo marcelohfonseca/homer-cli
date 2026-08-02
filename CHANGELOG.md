@@ -1,3 +1,9 @@
+## 0.2.0 (2026-08-02)
+
+### Feat
+
+- interactive tag selector for ck start (-t "" or -T)
+
 ## 0.1.10 (2026-08-02)
 
 ### Fix
