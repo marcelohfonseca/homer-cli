@@ -351,7 +351,8 @@ def current() -> None:
 
         rows: list[tuple[str, str]] = []
         if entry.projectId:
-            rows.append(("Project", entry.projectId))
+            project_name = service.get_project_name(entry.projectId) or entry.projectId
+            rows.append(("Project", project_name))
         if entry.tagIds:
             rows.append(("Tags", "  ".join(f"[cyan]#{t}[/cyan]" for t in entry.tagIds)))
 
@@ -407,7 +408,8 @@ def stop() -> None:
 
             rows: list[tuple[str, str]] = []
             if entry.projectId:
-                rows.append(("Project", entry.projectId))
+                project_name = service.get_project_name(entry.projectId) or entry.projectId
+                rows.append(("Project", project_name))
 
             content = Table.grid()
             content.add_row(header)

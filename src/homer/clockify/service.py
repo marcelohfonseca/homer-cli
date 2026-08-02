@@ -145,6 +145,20 @@ class ClockifyService:
         projects = self.client.get_projects()
         return sorted(p.name for p in projects)
 
+    def get_project_name(self, project_id: str) -> str | None:
+        """Resolve a project ID to its display name.
+
+        Args:
+            project_id: Clockify project ID.
+
+        Returns:
+            Project name, or None if not found.
+        """
+        for proj in self.client.get_projects():
+            if proj.id == project_id:
+                return proj.name
+        return None
+
     def list_tags(self) -> list[str]:
         """Return names of all existing Clockify tags.
 
