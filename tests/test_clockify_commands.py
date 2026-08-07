@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
+import typer
 from typer.testing import CliRunner
 
-from homer.clockify.commands import app
+from homer.clockify.commands import _chain_selection, _current_week_range, app
 from homer.clockify.models import TimeEntry, TimeInterval
 from homer.exceptions import ClockifyError
 
@@ -123,7 +125,11 @@ class TestStartCommand:
 
                 # Simulate user typing "1" then Enter to pick first project
                 with patch("homer.clockify.commands._prompt_project", return_value="web-api"):
-                    result = runner.invoke(app, ["start", "Work", "--select"])
+                    with patch(
+                        "homer.clockify.commands._chain_selection",
+                        return_value=("web-api", None),
+                    ):
+                        result = runner.invoke(app, ["start", "Work", "--select"])
 
         assert result.exit_code == 0
         call_args = mock_service.start_timer.call_args
@@ -149,7 +155,11 @@ class TestStartCommand:
                 mock_service_factory.return_value = mock_service
 
                 with patch("homer.clockify.commands._prompt_project", return_value="new-project"):
-                    result = runner.invoke(app, ["start", "Work", "--select"])
+                    with patch(
+                        "homer.clockify.commands._chain_selection",
+                        return_value=("new-project", None),
+                    ):
+                        result = runner.invoke(app, ["start", "Work", "--select"])
 
         assert result.exit_code == 0
         call_args = mock_service.start_timer.call_args
@@ -174,11 +184,188 @@ class TestStartCommand:
                 mock_service_factory.return_value = mock_service
 
                 with patch("homer.clockify.commands._prompt_project", return_value=None):
-                    result = runner.invoke(app, ["start", "Work", "--select"])
+                    with patch(
+                        "homer.clockify.commands._chain_selection",
+                        return_value=(None, None),
+                    ):
+                        result = runner.invoke(app, ["start", "Work", "--select"])
 
         assert result.exit_code == 0
         call_args = mock_service.start_timer.call_args
         assert call_args.kwargs["project_name"] is None
+
+    def test_does_not_invoke_chain_selection_when_no_selector_opened(
+        self, runner: CliRunner
+    ) -> None:
+        """Issue #8: backwards-compat — without -P/-T the timer starts immediately."""
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.start_timer.return_value = mock_entry
+                mock_service_factory.return_value = mock_service
+
+                with patch("homer.clockify.commands._chain_selection") as mock_chain:
+                    result = runner.invoke(app, ["start", "Work"])
+
+        assert result.exit_code == 0
+        mock_chain.assert_not_called()
+        mock_service.start_timer.assert_called_once()
+
+    def test_chain_selection_called_when_project_selector_opened(
+        self, runner: CliRunner
+    ) -> None:
+        """Issue #8: opening a selector must hand off to the chain flow."""
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+            projectId="p-1",
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.start_timer.return_value = mock_entry
+                mock_service_factory.return_value = mock_service
+
+                with patch(
+                    "homer.clockify.commands._prompt_project", return_value="web-api"
+                ):
+                    with patch(
+                        "homer.clockify.commands._chain_selection",
+                        return_value=("web-api", None),
+                    ) as mock_chain:
+                        result = runner.invoke(app, ["start", "Work", "--select"])
+
+        assert result.exit_code == 0
+        mock_chain.assert_called_once()
+        # The chain helper receives the already-resolved project.
+        call_kwargs = mock_chain.call_args.kwargs
+        assert call_kwargs["project"] == "web-api"
+
+    def test_chain_selection_called_when_tag_selector_opened(
+        self, runner: CliRunner
+    ) -> None:
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.start_timer.return_value = mock_entry
+                mock_service_factory.return_value = mock_service
+
+                with patch(
+                    "homer.clockify.commands._prompt_tags", return_value=["urgent"]
+                ):
+                    with patch(
+                        "homer.clockify.commands._chain_selection",
+                        return_value=(None, ["urgent"]),
+                    ) as mock_chain:
+                        result = runner.invoke(app, ["start", "Work", "--select-tags"])
+
+        assert result.exit_code == 0
+        mock_chain.assert_called_once()
+        assert mock_chain.call_args.kwargs["tags"] == ["urgent"]
+
+
+class TestChainSelection:
+    """Issue #8: chained project/tag selector flow before starting the timer."""
+
+    def test_empty_input_starts_with_current_values(self) -> None:
+        service = MagicMock()
+
+        with patch("homer.clockify.commands.typer.prompt", return_value=""):
+            project, tags = _chain_selection(
+                service=service,
+                description="Work",
+                project="web-api",
+                tags=["urgent"],
+            )
+
+        assert project == "web-api"
+        assert tags == ["urgent"]
+
+    def test_p_input_reprompts_project(self) -> None:
+        service = MagicMock()
+
+        with patch("homer.clockify.commands.typer.prompt") as mock_prompt:
+            mock_prompt.side_effect = ["p", ""]  # open project selector, then start
+            with patch(
+                "homer.clockify.commands._prompt_project", return_value="mobile-app"
+            ) as mock_project:
+                project, tags = _chain_selection(
+                    service=service,
+                    description="Work",
+                    project="web-api",
+                    tags=None,
+                )
+
+        assert project == "mobile-app"
+        assert tags is None
+        mock_project.assert_called_once_with(service)
+
+    def test_t_input_reprompts_tags(self) -> None:
+        service = MagicMock()
+
+        with patch("homer.clockify.commands.typer.prompt") as mock_prompt:
+            mock_prompt.side_effect = ["t", ""]  # open tag selector, then start
+            with patch(
+                "homer.clockify.commands._prompt_tags", return_value=["review", "qa"]
+            ) as mock_tags:
+                project, tags = _chain_selection(
+                    service=service,
+                    description="Work",
+                    project="web-api",
+                    tags=None,
+                )
+
+        assert project == "web-api"
+        assert tags == ["review", "qa"]
+        mock_tags.assert_called_once_with(service)
+
+    def test_q_input_aborts(self) -> None:
+        service = MagicMock()
+
+        with patch("homer.clockify.commands.typer.prompt", return_value="q"):
+            with pytest.raises(typer.Abort):
+                _chain_selection(
+                    service=service,
+                    description="Work",
+                    project="web-api",
+                    tags=None,
+                )
+
+    def test_unknown_option_keeps_looping_until_enter(self) -> None:
+        service = MagicMock()
+
+        with patch("homer.clockify.commands.typer.prompt") as mock_prompt:
+            mock_prompt.side_effect = ["z", "x", ""]  # two unknown, then start
+            project, tags = _chain_selection(
+                service=service,
+                description="Work",
+                project=None,
+                tags=None,
+            )
+
+        assert project is None
+        assert tags is None
+        assert mock_prompt.call_count == 3
 
 
 class TestCurrentCommand:
@@ -220,6 +407,96 @@ class TestCurrentCommand:
 
         assert result.exit_code == 0
         assert "No timer running" in result.output
+
+    def test_shows_tag_names_instead_of_ids(self, runner: CliRunner) -> None:
+        """Regression test for #9: tag IDs must be resolved to names."""
+        from homer.clockify.models import Tag
+
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+            tagIds=["t-1", "t-2"],
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.get_current_timer.return_value = mock_entry
+                mock_service.get_tag_name.side_effect = lambda tag_id: {
+                    "t-1": "Desenvolvimento",
+                    "t-2": "review",
+                }.get(tag_id)
+                mock_service.get_tags.return_value = [
+                    Tag(id="t-1", name="Desenvolvimento"),
+                    Tag(id="t-2", name="review"),
+                ]
+                mock_service_factory.return_value = mock_service
+
+                result = runner.invoke(app, ["current"])
+
+        assert result.exit_code == 0
+        assert "Desenvolvimento" in result.output
+        assert "review" in result.output
+
+    def test_falls_back_to_tag_id_when_name_not_resolved(
+        self, runner: CliRunner
+    ) -> None:
+        """If a tag ID cannot be resolved, the ID is shown as fallback."""
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+            tagIds=["t-unknown"],
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.get_current_timer.return_value = mock_entry
+                mock_service.get_tag_name.return_value = None
+                mock_service_factory.return_value = mock_service
+
+                result = runner.invoke(app, ["current"])
+
+        assert result.exit_code == 0
+        assert "t-unknown" in result.output
+
+
+class TestCurrentWeekRange:
+    """Helper computing the default date range for `summary` without args."""
+
+    def test_monday_returns_monday_to_today(self) -> None:
+        # 2026-08-03 is a Monday → week just started, end on Monday itself
+        assert _current_week_range(date(2026, 8, 3)) == ("2026-08-03", "2026-08-03")
+
+    def test_tuesday_returns_monday_to_today(self) -> None:
+        # 2026-08-04 is a Tuesday
+        assert _current_week_range(date(2026, 8, 4)) == ("2026-08-03", "2026-08-04")
+
+    def test_wednesday_returns_monday_to_today(self) -> None:
+        # 2026-08-05 is a Wednesday
+        assert _current_week_range(date(2026, 8, 5)) == ("2026-08-03", "2026-08-05")
+
+    def test_friday_returns_monday_to_today(self) -> None:
+        # 2026-08-07 is a Friday
+        assert _current_week_range(date(2026, 8, 7)) == ("2026-08-03", "2026-08-07")
+
+    def test_saturday_returns_full_week(self) -> None:
+        # 2026-08-08 is a Saturday → week already concluded → end on Sunday
+        assert _current_week_range(date(2026, 8, 8)) == ("2026-08-03", "2026-08-09")
+
+    def test_sunday_returns_full_week(self) -> None:
+        # 2026-08-09 is a Sunday → end on the same Sunday
+        assert _current_week_range(date(2026, 8, 9)) == ("2026-08-03", "2026-08-09")
+
+    def test_crosses_month_boundary_on_monday(self) -> None:
+        # 2026-08-31 is a Monday; weekday days → end on Monday
+        assert _current_week_range(date(2026, 8, 31)) == ("2026-08-31", "2026-08-31")
 
 
 class TestStopCommand:
@@ -338,6 +615,45 @@ class TestSummaryCommand:
         assert call_args.kwargs["project_name"] == "Web API"
         assert call_args.kwargs["tag_name"] == "urgent"
         assert call_args.kwargs["group_by"] == ["DATE"]
+
+    def test_defaults_to_current_week_when_no_args(self, runner: CliRunner) -> None:
+        """Issue #10: `homer ck summary` without args uses the current week."""
+        from homer.clockify.models import ReportSummary
+
+        mock_report = ReportSummary(groupOne=[], totals=[])
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.summary_report.return_value = mock_report
+                mock_service_factory.return_value = mock_service
+
+                # Fix "today" to a known Wednesday so the expected range is deterministic
+                with patch("homer.clockify.commands.date") as mock_date:
+                    mock_date.today.return_value = date(2026, 8, 5)  # Wednesday
+                    mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+                    result = runner.invoke(app, ["summary"])
+
+        assert result.exit_code == 0
+        call_args = mock_service.summary_report.call_args
+        assert call_args.kwargs["date_from"] == "2026-08-03"  # Monday
+        assert call_args.kwargs["date_to"] == "2026-08-05"    # Today (Wed)
+
+    def test_rejects_single_date_argument(self, runner: CliRunner) -> None:
+        """If only one of the two dates is given, the command fails fast."""
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service_factory.return_value = mock_service
+
+                result = runner.invoke(app, ["summary", "2026-07-31"])
+
+        assert result.exit_code == 1
+        assert "both" in result.output.lower()
 
     def test_shows_message_when_no_entries(self, runner: CliRunner) -> None:
         from homer.clockify.models import ReportSummary

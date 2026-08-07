@@ -60,13 +60,23 @@ homer ck start "Task" -p "" -T     # open both selectors
 homer ck start "Task" -P -T        # flags form
 ```
 
+When **any** selector is opened, Homer does **not** start the timer immediately.
+Instead it shows a review panel with the current values and offers:
+
+- `p` — reopen the project selector
+- `t` — reopen the tag selector
+- `Enter` — confirm and start the timer
+- `q` — cancel
+
+This way, you can pick a project and then one or more tags (in any order) in a single invocation.
+
 ### Check current timer
 
 ```bash
 homer ck current
 ```
 
-Shows description, elapsed time, project, and tags.
+Shows description, elapsed time, project, and **tag names** (resolved from IDs).
 
 ### Stop timers
 
@@ -85,6 +95,7 @@ Dates use `YYYY-MM-DD` format.
 ### Summary report
 
 ```bash
+homer ck summary                              # current week (Monday → today/Sun)
 homer ck summary 2026-01-01 2026-01-31
 ```
 
@@ -217,7 +228,8 @@ homer ck summary 2026-08-02 2026-08-02
 ### Weekly report
 
 ```bash
-homer ck summary 2026-07-28 2026-08-01
+homer ck summary                              # current week — no dates needed
+homer ck summary 2026-07-28 2026-08-01        # arbitrary week
 homer ck detailed 2026-07-28 2026-08-01
 ```
 

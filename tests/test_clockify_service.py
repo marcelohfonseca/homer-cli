@@ -207,6 +207,40 @@ class TestGetCurrentTimer:
         assert result.id == "e-1"
 
 
+class TestGetTagName:
+    """Service resolves tag IDs to display names."""
+
+    def test_returns_tag_name_when_found(
+        self, service: ClockifyService, mock_client: MagicMock
+    ) -> None:
+        mock_client.get_tags.return_value = [
+            Tag(id="t-1", name="Desenvolvimento"),
+            Tag(id="t-2", name="review"),
+        ]
+
+        result = service.get_tag_name("t-1")
+
+        assert result == "Desenvolvimento"
+
+    def test_returns_none_when_tag_not_found(
+        self, service: ClockifyService, mock_client: MagicMock
+    ) -> None:
+        mock_client.get_tags.return_value = [Tag(id="t-1", name="Desenvolvimento")]
+
+        result = service.get_tag_name("t-missing")
+
+        assert result is None
+
+    def test_returns_none_when_no_tags_exist(
+        self, service: ClockifyService, mock_client: MagicMock
+    ) -> None:
+        mock_client.get_tags.return_value = []
+
+        result = service.get_tag_name("t-1")
+
+        assert result is None
+
+
 class TestStopAllTimers:
     """Service stops all running timers."""
 

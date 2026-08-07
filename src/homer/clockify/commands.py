@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import typer
@@ -97,6 +97,37 @@ def _validate_date(date_str: str) -> str:
     except ValueError as e:
         raise ValueError(f"Invalid date: {date_str}. {e}")
     return date_str
+
+
+def _current_week_range(today: date | None = None) -> tuple[str, str]:
+    """Compute the default date range for a "this week" summary.
+
+    The week starts on Monday and ends on the most recent Sunday relative to
+    ``today``. Concretely:
+
+    - Monday → Sunday: full week (Monday through Sunday).
+    - Tuesday → Sunday: Monday through today.
+    - Saturday/Sunday: Monday through Sunday of the current week.
+
+    Args:
+        today: Reference date for the calculation. Defaults to the local
+            current date. Injectable for deterministic tests.
+
+    Returns:
+        Tuple of ``(date_from, date_to)`` in YYYY-MM-DD format.
+    """
+    if today is None:
+        today = date.today()
+
+    monday = today - timedelta(days=today.weekday())
+    # Saturday (5) and Sunday (6) are considered "week concluded" → end on Sunday.
+    # Monday (0) through Friday (4) → end on today.
+    if today.weekday() < 5:
+        end = today
+    else:
+        end = monday + timedelta(days=6)
+
+    return monday.isoformat(), end.isoformat()
 
 
 def _prompt_project(service: ClockifyService) -> str | None:
@@ -232,6 +263,68 @@ def _prompt_tags(service: ClockifyService) -> list[str] | None:
     return results or None
 
 
+def _chain_selection(
+    service: ClockifyService,
+    description: str,
+    project: str | None,
+    tags: list[str] | None,
+) -> tuple[str | None, list[str] | None]:
+    """Offer a post-selector menu so the user can configure the other side.
+
+    After at least one interactive selector (-P/-T or -p ""/-t "") was used,
+    this helper lets the user:
+
+    - open the other selector (project or tags) to add/change it,
+    - re-open the same selector to change the value, or
+    - confirm and start the timer.
+
+    Args:
+        service: Initialized ClockifyService used to query lists.
+        description: Timer description, used in the summary panel.
+        project: Project already chosen (may be None).
+        tags: Tags already chosen (may be None or empty).
+
+    Returns:
+        The final ``(project, tags)`` pair to use when starting the timer.
+    """
+    while True:
+        # Summary of what is currently set
+        project_label = project if project else "[dim](none)[/dim]"
+        tag_label = ", ".join(f"[cyan]#{t}[/cyan]" for t in tags) if tags else "[dim](none)[/dim]"
+
+        console.print(
+            Panel(
+                _kv_table(
+                    ("Description", description),
+                    ("Project", project_label),
+                    ("Tags", tag_label),
+                ),
+                title="[bold]Review selection[/bold]",
+                border_style="dim",
+                expand=False,
+                padding=(1, 2),
+            )
+        )
+        console.print(
+            "  [p][/p] change project  ·  [t][/t] change tags  ·  "
+            "[dim]Enter to start, 'q' to cancel[/dim]"
+        )
+
+        choice = typer.prompt("> ", default="", show_default=False, prompt_suffix="").strip().lower()
+
+        if choice in ("", "s", "start"):
+            return project, tags
+        if choice in ("q", "quit", "cancel"):
+            raise typer.Abort()
+        if choice in ("p", "project"):
+            project = _prompt_project(service)
+            continue
+        if choice in ("t", "tag", "tags"):
+            tags = _prompt_tags(service)
+            continue
+        console.print(f"[yellow]⚠[/yellow]  Unknown option '{choice}'. Press Enter to start, 'p' or 't' to edit.")
+
+
 @app.command()
 def start(
     description: str = typer.Argument(
@@ -258,6 +351,12 @@ def start(
 
     By default starts immediately without prompting for a project or tags.
     Use -p / -P to set or select a project; use -t / -T to set or select tags.
+
+    When -P and/or -T is used, the CLI enters a chained-selection flow: after
+    each selector returns, the user is offered the choice to open the other
+    selector, change the current one, or confirm and start the timer. This
+    makes it possible to pick a project and one or more tags in a single
+    invocation, in any order.
 
     Examples:
         homer ck start "Fixing login bug"
@@ -287,6 +386,16 @@ def start(
             tag_list = [t.strip() for t in tags.split(",") if t.strip()]
         else:
             tag_list = None
+
+        # If a selector was opened, enter the chained-selection flow so the
+        # user can also configure the other parameter before starting.
+        if open_selector or open_tag_selector:
+            resolved_project, tag_list = _chain_selection(
+                service=service,
+                description=description,
+                project=resolved_project,
+                tags=tag_list,
+            )
 
         entry = service.start_timer(
             description=description,
@@ -354,7 +463,10 @@ def current() -> None:
             project_name = service.get_project_name(entry.projectId) or entry.projectId
             rows.append(("Project", project_name))
         if entry.tagIds:
-            rows.append(("Tags", "  ".join(f"[cyan]#{t}[/cyan]" for t in entry.tagIds)))
+            tag_labels = [
+                f"[cyan]#{service.get_tag_name(t) or t}[/cyan]" for t in entry.tagIds
+            ]
+            rows.append(("Tags", "  ".join(tag_labels)))
 
         content = Table.grid(padding=(0, 0))
         content.add_row(header)
@@ -433,8 +545,8 @@ def stop() -> None:
 
 @app.command()
 def summary(
-    date_from: str = typer.Argument(help="Start date (YYYY-MM-DD)"),
-    date_to: str = typer.Argument(help="End date (YYYY-MM-DD)"),
+    date_from: str | None = typer.Argument(None, help="Start date (YYYY-MM-DD). Defaults to Monday of the current week."),
+    date_to: str | None = typer.Argument(None, help="End date (YYYY-MM-DD). Defaults to today (or Sunday if the week is over)."),
     project: str | None = typer.Option(None, "--project", "-p", help="Filter by project name"),
     tags: str | None = typer.Option(None, "--tags", "-t", help="Filter by tag name"),
     group_by: str | None = typer.Option(
@@ -445,11 +557,18 @@ def summary(
     """Fetch a summary report for a date range.
 
     Examples:
+        homer ck summary                          # current week (Mon → today/Sun)
         homer ck summary 2024-01-01 2024-01-31
         homer ck summary 2024-01-01 2024-01-31 --project "web-api"
         homer ck summary 2024-01-01 2024-01-31 --group-by DATE
     """
     try:
+        if date_from is None or date_to is None:
+            if date_from is not None or date_to is not None:
+                raise ValueError(
+                    "Provide both DATE_FROM and DATE_TO, or omit both for the current week."
+                )
+            date_from, date_to = _current_week_range()
         date_from = _validate_date(date_from)
         date_to = _validate_date(date_to)
         service = _get_service()

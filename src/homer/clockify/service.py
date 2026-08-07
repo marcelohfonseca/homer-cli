@@ -159,6 +159,20 @@ class ClockifyService:
                 return proj.name
         return None
 
+    def get_tag_name(self, tag_id: str) -> str | None:
+        """Resolve a tag ID to its display name.
+
+        Args:
+            tag_id: Clockify tag ID.
+
+        Returns:
+            Tag name, or None if not found.
+        """
+        for tag in self.client.get_tags():
+            if tag.id == tag_id:
+                return tag.name
+        return None
+
     def list_tags(self) -> list[str]:
         """Return names of all existing Clockify tags.
 
