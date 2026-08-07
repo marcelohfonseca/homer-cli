@@ -1,3 +1,15 @@
+## 0.3.0 (2026-08-06)
+
+### Feat
+
+- **clockify**: chain project/tag selectors before starting (#8)
+- **clockify**: default ck summary to current week (#10)
+
+### Fix
+
+- **clockify**: resolve tag IDs to names in ck current output (#9)
+- use version_files in commitizen to auto-update __init__.py on bump
+
 ## 0.2.3 (2026-08-02)
 
 ### Fix
