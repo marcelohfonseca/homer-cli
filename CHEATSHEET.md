@@ -29,6 +29,7 @@ homer ck stop                                   # stop all timers
 ## Clockify — Reports
 
 ```bash
+homer ck summary                                # current week (Mon → today/Sun)
 homer ck summary  2026-01-01 2026-01-31         # summary by project
 homer ck summary  2026-01-01 2026-01-31 -g DATE # group by date
 homer ck summary  2026-01-01 2026-01-31 -g TAG  # group by tag
@@ -67,3 +68,5 @@ nano ~/.env         # edit manually
 - `-p ""` or `-P` opens selector (Clockify projects + open Jira issues)
 - `-t ""` or `-T` opens tag selector (Clockify tags)
 - Tag selector: pick multiple with `1,3,5` or type free-form names
+- After any selector, a review panel lets you reopen either selector before starting (`p`/`t`/Enter/`q`)
+- `homer ck summary` with no args reports the current week (Monday → today, or Sunday if today is Sat/Sun)

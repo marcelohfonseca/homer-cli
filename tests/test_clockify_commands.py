@@ -6,9 +6,10 @@ from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
+import typer
 from typer.testing import CliRunner
 
-from homer.clockify.commands import _current_week_range, app
+from homer.clockify.commands import _chain_selection, _current_week_range, app
 from homer.clockify.models import TimeEntry, TimeInterval
 from homer.exceptions import ClockifyError
 
@@ -124,7 +125,11 @@ class TestStartCommand:
 
                 # Simulate user typing "1" then Enter to pick first project
                 with patch("homer.clockify.commands._prompt_project", return_value="web-api"):
-                    result = runner.invoke(app, ["start", "Work", "--select"])
+                    with patch(
+                        "homer.clockify.commands._chain_selection",
+                        return_value=("web-api", None),
+                    ):
+                        result = runner.invoke(app, ["start", "Work", "--select"])
 
         assert result.exit_code == 0
         call_args = mock_service.start_timer.call_args
@@ -150,7 +155,11 @@ class TestStartCommand:
                 mock_service_factory.return_value = mock_service
 
                 with patch("homer.clockify.commands._prompt_project", return_value="new-project"):
-                    result = runner.invoke(app, ["start", "Work", "--select"])
+                    with patch(
+                        "homer.clockify.commands._chain_selection",
+                        return_value=("new-project", None),
+                    ):
+                        result = runner.invoke(app, ["start", "Work", "--select"])
 
         assert result.exit_code == 0
         call_args = mock_service.start_timer.call_args
@@ -175,11 +184,188 @@ class TestStartCommand:
                 mock_service_factory.return_value = mock_service
 
                 with patch("homer.clockify.commands._prompt_project", return_value=None):
-                    result = runner.invoke(app, ["start", "Work", "--select"])
+                    with patch(
+                        "homer.clockify.commands._chain_selection",
+                        return_value=(None, None),
+                    ):
+                        result = runner.invoke(app, ["start", "Work", "--select"])
 
         assert result.exit_code == 0
         call_args = mock_service.start_timer.call_args
         assert call_args.kwargs["project_name"] is None
+
+    def test_does_not_invoke_chain_selection_when_no_selector_opened(
+        self, runner: CliRunner
+    ) -> None:
+        """Issue #8: backwards-compat — without -P/-T the timer starts immediately."""
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.start_timer.return_value = mock_entry
+                mock_service_factory.return_value = mock_service
+
+                with patch("homer.clockify.commands._chain_selection") as mock_chain:
+                    result = runner.invoke(app, ["start", "Work"])
+
+        assert result.exit_code == 0
+        mock_chain.assert_not_called()
+        mock_service.start_timer.assert_called_once()
+
+    def test_chain_selection_called_when_project_selector_opened(
+        self, runner: CliRunner
+    ) -> None:
+        """Issue #8: opening a selector must hand off to the chain flow."""
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+            projectId="p-1",
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.start_timer.return_value = mock_entry
+                mock_service_factory.return_value = mock_service
+
+                with patch(
+                    "homer.clockify.commands._prompt_project", return_value="web-api"
+                ):
+                    with patch(
+                        "homer.clockify.commands._chain_selection",
+                        return_value=("web-api", None),
+                    ) as mock_chain:
+                        result = runner.invoke(app, ["start", "Work", "--select"])
+
+        assert result.exit_code == 0
+        mock_chain.assert_called_once()
+        # The chain helper receives the already-resolved project.
+        call_kwargs = mock_chain.call_args.kwargs
+        assert call_kwargs["project"] == "web-api"
+
+    def test_chain_selection_called_when_tag_selector_opened(
+        self, runner: CliRunner
+    ) -> None:
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.start_timer.return_value = mock_entry
+                mock_service_factory.return_value = mock_service
+
+                with patch(
+                    "homer.clockify.commands._prompt_tags", return_value=["urgent"]
+                ):
+                    with patch(
+                        "homer.clockify.commands._chain_selection",
+                        return_value=(None, ["urgent"]),
+                    ) as mock_chain:
+                        result = runner.invoke(app, ["start", "Work", "--select-tags"])
+
+        assert result.exit_code == 0
+        mock_chain.assert_called_once()
+        assert mock_chain.call_args.kwargs["tags"] == ["urgent"]
+
+
+class TestChainSelection:
+    """Issue #8: chained project/tag selector flow before starting the timer."""
+
+    def test_empty_input_starts_with_current_values(self) -> None:
+        service = MagicMock()
+
+        with patch("homer.clockify.commands.typer.prompt", return_value=""):
+            project, tags = _chain_selection(
+                service=service,
+                description="Work",
+                project="web-api",
+                tags=["urgent"],
+            )
+
+        assert project == "web-api"
+        assert tags == ["urgent"]
+
+    def test_p_input_reprompts_project(self) -> None:
+        service = MagicMock()
+
+        with patch("homer.clockify.commands.typer.prompt") as mock_prompt:
+            mock_prompt.side_effect = ["p", ""]  # open project selector, then start
+            with patch(
+                "homer.clockify.commands._prompt_project", return_value="mobile-app"
+            ) as mock_project:
+                project, tags = _chain_selection(
+                    service=service,
+                    description="Work",
+                    project="web-api",
+                    tags=None,
+                )
+
+        assert project == "mobile-app"
+        assert tags is None
+        mock_project.assert_called_once_with(service)
+
+    def test_t_input_reprompts_tags(self) -> None:
+        service = MagicMock()
+
+        with patch("homer.clockify.commands.typer.prompt") as mock_prompt:
+            mock_prompt.side_effect = ["t", ""]  # open tag selector, then start
+            with patch(
+                "homer.clockify.commands._prompt_tags", return_value=["review", "qa"]
+            ) as mock_tags:
+                project, tags = _chain_selection(
+                    service=service,
+                    description="Work",
+                    project="web-api",
+                    tags=None,
+                )
+
+        assert project == "web-api"
+        assert tags == ["review", "qa"]
+        mock_tags.assert_called_once_with(service)
+
+    def test_q_input_aborts(self) -> None:
+        service = MagicMock()
+
+        with patch("homer.clockify.commands.typer.prompt", return_value="q"):
+            with pytest.raises(typer.Abort):
+                _chain_selection(
+                    service=service,
+                    description="Work",
+                    project="web-api",
+                    tags=None,
+                )
+
+    def test_unknown_option_keeps_looping_until_enter(self) -> None:
+        service = MagicMock()
+
+        with patch("homer.clockify.commands.typer.prompt") as mock_prompt:
+            mock_prompt.side_effect = ["z", "x", ""]  # two unknown, then start
+            project, tags = _chain_selection(
+                service=service,
+                description="Work",
+                project=None,
+                tags=None,
+            )
+
+        assert project is None
+        assert tags is None
+        assert mock_prompt.call_count == 3
 
 
 class TestCurrentCommand:

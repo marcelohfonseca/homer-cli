@@ -52,6 +52,7 @@ homer ck start "Standup" -T                 # open tag selector
 homer ck current                            # check elapsed time
 homer ck stop                               # stop all timers
 
+homer ck summary                            # current week (Mon → today/Sun)
 homer ck summary 2026-01-01 2026-01-31      # monthly report
 ```
 
@@ -78,8 +79,10 @@ homer ck summary 2026-01-01 2026-01-31      # monthly report
 | `homer ck start DESCRIPTION -p ""` or `-P` | Start and open interactive project selector |
 | `homer ck start DESCRIPTION -t "tag1,tag2"` | Start with tags |
 | `homer ck start DESCRIPTION -t ""` or `-T` | Start and open interactive tag selector |
-| `homer ck current` | Show currently running timer |
+| `homer ck current` | Show currently running timer (resolves tag names) |
 | `homer ck stop` | Stop all running timers |
+
+When a selector is opened (`-P`/`-T`/`-p ""`/`-t ""`), the timer does **not** start immediately — Homer shows a review panel and lets you reopen either selector before confirming.
 
 **`start` options:**
 
@@ -94,6 +97,7 @@ homer ck summary 2026-01-01 2026-01-31      # monthly report
 
 | Command | Description |
 |---|---|
+| `homer ck summary` | Current week summary (Monday → today, or Sunday) |
 | `homer ck summary DATE_FROM DATE_TO` | Summary report grouped by project |
 | `homer ck summary DATE_FROM DATE_TO -g DATE` | Group by date |
 | `homer ck summary DATE_FROM DATE_TO -g TAG` | Group by tag |
