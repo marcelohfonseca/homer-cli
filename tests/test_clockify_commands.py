@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
 
-from homer.clockify.commands import app
+from homer.clockify.commands import _current_week_range, app
 from homer.clockify.models import TimeEntry, TimeInterval
 from homer.exceptions import ClockifyError
 
@@ -280,6 +281,38 @@ class TestCurrentCommand:
         assert "t-unknown" in result.output
 
 
+class TestCurrentWeekRange:
+    """Helper computing the default date range for `summary` without args."""
+
+    def test_monday_returns_monday_to_today(self) -> None:
+        # 2026-08-03 is a Monday → week just started, end on Monday itself
+        assert _current_week_range(date(2026, 8, 3)) == ("2026-08-03", "2026-08-03")
+
+    def test_tuesday_returns_monday_to_today(self) -> None:
+        # 2026-08-04 is a Tuesday
+        assert _current_week_range(date(2026, 8, 4)) == ("2026-08-03", "2026-08-04")
+
+    def test_wednesday_returns_monday_to_today(self) -> None:
+        # 2026-08-05 is a Wednesday
+        assert _current_week_range(date(2026, 8, 5)) == ("2026-08-03", "2026-08-05")
+
+    def test_friday_returns_monday_to_today(self) -> None:
+        # 2026-08-07 is a Friday
+        assert _current_week_range(date(2026, 8, 7)) == ("2026-08-03", "2026-08-07")
+
+    def test_saturday_returns_full_week(self) -> None:
+        # 2026-08-08 is a Saturday → week already concluded → end on Sunday
+        assert _current_week_range(date(2026, 8, 8)) == ("2026-08-03", "2026-08-09")
+
+    def test_sunday_returns_full_week(self) -> None:
+        # 2026-08-09 is a Sunday → end on the same Sunday
+        assert _current_week_range(date(2026, 8, 9)) == ("2026-08-03", "2026-08-09")
+
+    def test_crosses_month_boundary_on_monday(self) -> None:
+        # 2026-08-31 is a Monday; weekday days → end on Monday
+        assert _current_week_range(date(2026, 8, 31)) == ("2026-08-31", "2026-08-31")
+
+
 class TestStopCommand:
     """homer clockify stop command."""
 
@@ -396,6 +429,45 @@ class TestSummaryCommand:
         assert call_args.kwargs["project_name"] == "Web API"
         assert call_args.kwargs["tag_name"] == "urgent"
         assert call_args.kwargs["group_by"] == ["DATE"]
+
+    def test_defaults_to_current_week_when_no_args(self, runner: CliRunner) -> None:
+        """Issue #10: `homer ck summary` without args uses the current week."""
+        from homer.clockify.models import ReportSummary
+
+        mock_report = ReportSummary(groupOne=[], totals=[])
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.summary_report.return_value = mock_report
+                mock_service_factory.return_value = mock_service
+
+                # Fix "today" to a known Wednesday so the expected range is deterministic
+                with patch("homer.clockify.commands.date") as mock_date:
+                    mock_date.today.return_value = date(2026, 8, 5)  # Wednesday
+                    mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+                    result = runner.invoke(app, ["summary"])
+
+        assert result.exit_code == 0
+        call_args = mock_service.summary_report.call_args
+        assert call_args.kwargs["date_from"] == "2026-08-03"  # Monday
+        assert call_args.kwargs["date_to"] == "2026-08-05"    # Today (Wed)
+
+    def test_rejects_single_date_argument(self, runner: CliRunner) -> None:
+        """If only one of the two dates is given, the command fails fast."""
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service_factory.return_value = mock_service
+
+                result = runner.invoke(app, ["summary", "2026-07-31"])
+
+        assert result.exit_code == 1
+        assert "both" in result.output.lower()
 
     def test_shows_message_when_no_entries(self, runner: CliRunner) -> None:
         from homer.clockify.models import ReportSummary

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import typer
@@ -97,6 +97,37 @@ def _validate_date(date_str: str) -> str:
     except ValueError as e:
         raise ValueError(f"Invalid date: {date_str}. {e}")
     return date_str
+
+
+def _current_week_range(today: date | None = None) -> tuple[str, str]:
+    """Compute the default date range for a "this week" summary.
+
+    The week starts on Monday and ends on the most recent Sunday relative to
+    ``today``. Concretely:
+
+    - Monday → Sunday: full week (Monday through Sunday).
+    - Tuesday → Sunday: Monday through today.
+    - Saturday/Sunday: Monday through Sunday of the current week.
+
+    Args:
+        today: Reference date for the calculation. Defaults to the local
+            current date. Injectable for deterministic tests.
+
+    Returns:
+        Tuple of ``(date_from, date_to)`` in YYYY-MM-DD format.
+    """
+    if today is None:
+        today = date.today()
+
+    monday = today - timedelta(days=today.weekday())
+    # Saturday (5) and Sunday (6) are considered "week concluded" → end on Sunday.
+    # Monday (0) through Friday (4) → end on today.
+    if today.weekday() < 5:
+        end = today
+    else:
+        end = monday + timedelta(days=6)
+
+    return monday.isoformat(), end.isoformat()
 
 
 def _prompt_project(service: ClockifyService) -> str | None:
@@ -436,8 +467,8 @@ def stop() -> None:
 
 @app.command()
 def summary(
-    date_from: str = typer.Argument(help="Start date (YYYY-MM-DD)"),
-    date_to: str = typer.Argument(help="End date (YYYY-MM-DD)"),
+    date_from: str | None = typer.Argument(None, help="Start date (YYYY-MM-DD). Defaults to Monday of the current week."),
+    date_to: str | None = typer.Argument(None, help="End date (YYYY-MM-DD). Defaults to today (or Sunday if the week is over)."),
     project: str | None = typer.Option(None, "--project", "-p", help="Filter by project name"),
     tags: str | None = typer.Option(None, "--tags", "-t", help="Filter by tag name"),
     group_by: str | None = typer.Option(
@@ -448,11 +479,18 @@ def summary(
     """Fetch a summary report for a date range.
 
     Examples:
+        homer ck summary                          # current week (Mon → today/Sun)
         homer ck summary 2024-01-01 2024-01-31
         homer ck summary 2024-01-01 2024-01-31 --project "web-api"
         homer ck summary 2024-01-01 2024-01-31 --group-by DATE
     """
     try:
+        if date_from is None or date_to is None:
+            if date_from is not None or date_to is not None:
+                raise ValueError(
+                    "Provide both DATE_FROM and DATE_TO, or omit both for the current week."
+                )
+            date_from, date_to = _current_week_range()
         date_from = _validate_date(date_from)
         date_to = _validate_date(date_to)
         service = _get_service()
