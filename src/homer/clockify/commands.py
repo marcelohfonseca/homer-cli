@@ -354,7 +354,10 @@ def current() -> None:
             project_name = service.get_project_name(entry.projectId) or entry.projectId
             rows.append(("Project", project_name))
         if entry.tagIds:
-            rows.append(("Tags", "  ".join(f"[cyan]#{t}[/cyan]" for t in entry.tagIds)))
+            tag_labels = [
+                f"[cyan]#{service.get_tag_name(t) or t}[/cyan]" for t in entry.tagIds
+            ]
+            rows.append(("Tags", "  ".join(tag_labels)))
 
         content = Table.grid(padding=(0, 0))
         content.add_row(header)

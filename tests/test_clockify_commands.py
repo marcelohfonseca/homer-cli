@@ -221,6 +221,64 @@ class TestCurrentCommand:
         assert result.exit_code == 0
         assert "No timer running" in result.output
 
+    def test_shows_tag_names_instead_of_ids(self, runner: CliRunner) -> None:
+        """Regression test for #9: tag IDs must be resolved to names."""
+        from homer.clockify.models import Tag
+
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+            tagIds=["t-1", "t-2"],
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.get_current_timer.return_value = mock_entry
+                mock_service.get_tag_name.side_effect = lambda tag_id: {
+                    "t-1": "Desenvolvimento",
+                    "t-2": "review",
+                }.get(tag_id)
+                mock_service.get_tags.return_value = [
+                    Tag(id="t-1", name="Desenvolvimento"),
+                    Tag(id="t-2", name="review"),
+                ]
+                mock_service_factory.return_value = mock_service
+
+                result = runner.invoke(app, ["current"])
+
+        assert result.exit_code == 0
+        assert "Desenvolvimento" in result.output
+        assert "review" in result.output
+
+    def test_falls_back_to_tag_id_when_name_not_resolved(
+        self, runner: CliRunner
+    ) -> None:
+        """If a tag ID cannot be resolved, the ID is shown as fallback."""
+        mock_entry = TimeEntry(
+            id="e-1",
+            timeInterval=TimeInterval(start="2026-07-31T08:00:00Z"),
+            description="Work",
+            tagIds=["t-unknown"],
+        )
+
+        with patch("homer.clockify.commands.get_settings"):
+            with patch(
+                "homer.clockify.commands.ClockifyService.from_settings"
+            ) as mock_service_factory:
+                mock_service = MagicMock()
+                mock_service.get_current_timer.return_value = mock_entry
+                mock_service.get_tag_name.return_value = None
+                mock_service_factory.return_value = mock_service
+
+                result = runner.invoke(app, ["current"])
+
+        assert result.exit_code == 0
+        assert "t-unknown" in result.output
+
 
 class TestStopCommand:
     """homer clockify stop command."""
